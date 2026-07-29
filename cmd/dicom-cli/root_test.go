@@ -82,6 +82,9 @@ func TestExecuteUsesInjectedRuntime(t *testing.T) {
 			cwdCalls++
 			return ".", nil
 		},
+		UserConfigDir: func() (string, error) {
+			return ".", nil
+		},
 		LookupEnv: func(string) (string, bool) {
 			envCalls++
 			return "", false
@@ -105,6 +108,9 @@ func testRuntime() (Runtime, *bytes.Buffer, *bytes.Buffer) {
 		Stdout: &stdout,
 		Stderr: &stderr,
 		Getwd: func() (string, error) {
+			return ".", nil
+		},
+		UserConfigDir: func() (string, error) {
 			return ".", nil
 		},
 		LookupEnv: func(string) (string, bool) {

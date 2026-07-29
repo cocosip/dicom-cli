@@ -14,21 +14,23 @@ import (
 
 // Runtime provides process dependencies to commands without requiring globals.
 type Runtime struct {
-	Stdin     io.Reader
-	Stdout    io.Writer
-	Stderr    io.Writer
-	Getwd     func() (string, error)
-	LookupEnv func(string) (string, bool)
+	Stdin         io.Reader
+	Stdout        io.Writer
+	Stderr        io.Writer
+	Getwd         func() (string, error)
+	UserConfigDir func() (string, error)
+	LookupEnv     func(string) (string, bool)
 }
 
 // ProductionRuntime returns the dependencies used by the executable.
 func ProductionRuntime() Runtime {
 	return Runtime{
-		Stdin:     os.Stdin,
-		Stdout:    os.Stdout,
-		Stderr:    os.Stderr,
-		Getwd:     os.Getwd,
-		LookupEnv: os.LookupEnv,
+		Stdin:         os.Stdin,
+		Stdout:        os.Stdout,
+		Stderr:        os.Stderr,
+		Getwd:         os.Getwd,
+		UserConfigDir: os.UserConfigDir,
+		LookupEnv:     os.LookupEnv,
 	}
 }
 
@@ -46,7 +48,7 @@ func Execute(args []string, runtime Runtime) int {
 	command.SetArgs(args)
 
 	if err := command.Execute(); err != nil {
-		fmt.Fprintln(runtime.Stderr, err)
+		_, _ = fmt.Fprintln(runtime.Stderr, err)
 		return apperr.ExitCode(err)
 	}
 
@@ -86,6 +88,8 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	flags.BoolVarP(&options.verbose, "verbose", "v", false, "enable debug logging")
 	flags.BoolVarP(&options.quiet, "quiet", "q", false, "only log errors")
 	flags.StringVar(&options.logFormat, "log-format", "text", "log format: text or json")
+	command.AddCommand(newConfigCommand(runtime, &options))
+	command.AddCommand(newRulesCommand(runtime, &options))
 
 	return command
 }

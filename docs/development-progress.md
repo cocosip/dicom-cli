@@ -21,16 +21,16 @@
 
 ## P1 运行配置与规则文件
 
-- [ ] **P1.1 定义运行配置模型**：依赖 P0.1；完成条件：支持版本、UID 根、命名 PACS、超时及预留 TLS/代理/认证字段，非法端口和 AE Title 有单元测试。
-- [ ] **P1.2 实现运行配置发现**：依赖 P1.1、P0.6；完成条件：覆盖 `--config`、当前目录优先、用户目录回退且不合并的表驱动测试通过。
-- [ ] **P1.3 实现配置优先级**：依赖 P1.2；完成条件：命令行、`DICOM_CLI_*`、配置和默认值的冲突优先级均有测试。
-- [ ] **P1.4 实现 config init/validate**：依赖 P1.1-P1.3；完成条件：YAML/JSON 示例均可生成和校验，既有文件无 `--force` 时被拒绝覆盖。
-- [ ] **P1.5 实现命名 PACS 目标 CRUD**：依赖 P1.4；完成条件：`config target list|add|update|remove` 的临时配置集成测试通过。
-- [ ] **P1.6 定义规则文件 v1 模型**：依赖 P0.1；完成条件：统一保存筛选、inspect、anonymize、validate 与 DICOM 模板，未知字段被严格拒绝。
-- [ ] **P1.7 实现条件 DSL**：依赖 P1.6；完成条件：Tag 路径、存在性、相等、正则、数值范围、`all`、`any` 分别有单元测试。
-- [ ] **P1.8 实现规则静态校验**：依赖 P1.6、P1.7；完成条件：命名引用、Tag 路径、动作参数、重复脱敏动作都校验，坏文件可一次列出全部问题。
-- [ ] **P1.9 实现 rules init/validate**：依赖 P1.8；完成条件：YAML/JSON 示例生成后均通过 `rules validate`。
-- [ ] **P1.10 验收 P1**：依赖 P1.1-P1.9；完成条件：`go test ./internal/config ./internal/rules ./cmd/dicom-cli` 成功。
+- [x] **P1.1 定义运行配置模型**：依赖 P0.1；完成条件：支持版本、UID 根、命名 PACS、超时及预留 TLS/代理/认证字段，非法端口和 AE Title 有单元测试。
+- [x] **P1.2 实现运行配置发现**：依赖 P1.1、P0.6；完成条件：覆盖 `--config`、当前目录优先、用户目录回退且不合并的表驱动测试通过。
+- [x] **P1.3 实现配置优先级**：依赖 P1.2；完成条件：命令行、`DICOM_CLI_*`、配置和默认值的冲突优先级均有测试。
+- [x] **P1.4 实现 config init/validate**：依赖 P1.1-P1.3；完成条件：YAML/JSON 示例均可生成和校验，既有文件无 `--force` 时被拒绝覆盖。
+- [x] **P1.5 实现命名 PACS 目标 CRUD**：依赖 P1.4；完成条件：`config target list|add|update|remove` 的临时配置集成测试通过。
+- [x] **P1.6 定义规则文件 v1 模型**：依赖 P0.1；完成条件：统一保存筛选、inspect、anonymize、validate 与 DICOM 模板，未知字段被严格拒绝。
+- [x] **P1.7 实现条件 DSL**：依赖 P1.6；完成条件：Tag 路径、存在性、相等、正则、数值范围、`all`、`any` 分别有单元测试。
+- [x] **P1.8 实现规则静态校验**：依赖 P1.6、P1.7；完成条件：命名引用、Tag 路径、动作参数、重复脱敏动作都校验，坏文件可一次列出全部问题。
+- [x] **P1.9 实现 rules init/validate**：依赖 P1.8；完成条件：YAML/JSON 示例生成后均通过 `rules validate`。
+- [x] **P1.10 验收 P1**：依赖 P1.1-P1.9；完成条件：`go test ./internal/config ./internal/rules ./cmd/dicom-cli` 成功。
 
 ## P2 DICOM 基础能力与批处理基础设施
 
