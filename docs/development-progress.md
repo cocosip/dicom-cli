@@ -7,17 +7,17 @@
 - [x] **D0.1 产品范围讨论**：已完成；见 [讨论稿](dicom-cli-discussion.md)。
 - [x] **D0.2 需求规格**：已完成；见 [需求规格](requirements.md)。
 - [x] **D0.3 开发执行台账**：已完成；本文件为后续唯一进度入口。
-- [ ] **D0.4 Go 工程初始化**：尚未创建 `go.mod`、Go 源码或测试样本。
+- [x] **D0.4 Go 工程初始化**：已创建 `go.mod`、Go 源码和测试样本。
 
 ## P0 工程骨架与公共契约
 
-- [ ] **P0.1 初始化 Go 模块与直接依赖**：依赖 D0.3；完成条件：`go.mod` 声明 Go 1.26、Cobra、Viper、go-dicom、go-dicom-codecs，`go mod tidy` 和 `go list -m all` 成功。
-- [ ] **P0.2 建立可执行入口**：依赖 P0.1；完成条件：存在 `cmd/dicom-cli/main.go`，`go build ./cmd/dicom-cli` 成功。
-- [ ] **P0.3 定义应用错误与退出码**：依赖 P0.1；完成条件：处理失败映射 1、参数/配置/规则错误映射 2、校验失败映射 3，且单元测试覆盖全部映射。
-- [ ] **P0.4 建立根 Cobra 命令和全局参数**：依赖 P0.2、P0.3；完成条件：`-c/-R/-v/-q/--log-format` 可用，`go run ./cmd/dicom-cli --help` 正确展示。
-- [ ] **P0.5 接入 slog 日志**：依赖 P0.4；完成条件：支持 info/debug/error 和 JSON 格式，流测试证明日志固定写入 stderr。
-- [ ] **P0.6 建立命令测试设施**：依赖 P0.4；完成条件：测试可注入 stdin/stdout/stderr、工作目录和环境变量，不依赖真实控制台或用户目录。
-- [ ] **P0.7 验收 P0**：依赖 P0.1-P0.6；完成条件：`go test ./cmd/dicom-cli ./internal/apperr` 与 `go vet ./cmd/dicom-cli ./internal/apperr` 成功。
+- [x] **P0.1 初始化 Go 模块与直接依赖**：依赖 D0.3；完成条件：`go.mod` 声明 Go 1.26、Cobra、Viper、go-dicom、go-dicom-codecs，`go mod tidy` 和 `go list -m all` 成功。
+- [x] **P0.2 建立可执行入口**：依赖 P0.1；完成条件：存在 `cmd/dicom-cli/main.go`，`go build ./cmd/dicom-cli` 成功。
+- [x] **P0.3 定义应用错误与退出码**：依赖 P0.1；完成条件：处理失败映射 1、参数/配置/规则错误映射 2、校验失败映射 3，且单元测试覆盖全部映射。
+- [x] **P0.4 建立根 Cobra 命令和全局参数**：依赖 P0.2、P0.3；完成条件：`-c/-R/-v/-q/--log-format` 可用，`go run ./cmd/dicom-cli --help` 正确展示。
+- [x] **P0.5 接入 slog 日志**：依赖 P0.4；完成条件：支持 info/debug/error 和 JSON 格式，流测试证明日志固定写入 stderr。
+- [x] **P0.6 建立命令测试设施**：依赖 P0.4；完成条件：测试可注入 stdin/stdout/stderr、工作目录和环境变量，不依赖真实控制台或用户目录。
+- [x] **P0.7 验收 P0**：依赖 P0.1-P0.6；完成条件：`go test ./cmd/dicom-cli ./internal/apperr` 与 `go vet ./cmd/dicom-cli ./internal/apperr` 成功。
 
 ## P1 运行配置与规则文件
 
