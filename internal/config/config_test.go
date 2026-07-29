@@ -12,6 +12,9 @@ func TestDefaultConfigUsesDIMSETimeoutDefaults(t *testing.T) {
 	if config.Version != VersionV1 {
 		t.Fatalf("Version = %q, want %q", config.Version, VersionV1)
 	}
+	if config.UIDRoot != DefaultUIDRoot {
+		t.Fatalf("UIDRoot = %q, want %q", config.UIDRoot, DefaultUIDRoot)
+	}
 	if config.Timeouts.Connect != 10*time.Second {
 		t.Fatalf("Connect = %s, want 10s", config.Timeouts.Connect)
 	}

@@ -1,0 +1,57 @@
+# Copy this file to dicom-cli-rules.yaml and select the named profiles in commands.
+version: v1
+
+filters:
+  ct-images:
+    all:
+      - path: Modality
+        equals: CT
+      - path: SOPInstanceUID
+        exists: true
+
+inspect:
+  profiles:
+    summary:
+      tags:
+        - PatientName
+        - PatientID
+        - StudyInstanceUID
+        - SeriesInstanceUID
+        - SOPInstanceUID
+        - 0040,A730[0].0040,A160
+
+anonymize:
+  profiles:
+    basic:
+      filter: ct-images
+      rules:
+        - path: PatientName
+          action: replace
+          value: ANON^PATIENT
+        - path: PatientID
+          action: clear
+        - path: AccessionNumber
+          action: delete
+        - path: StudyInstanceUID
+          action: remap_uid
+
+validate:
+  profiles:
+    ct-required-identifiers:
+      rules:
+        - when:
+            path: Modality
+            equals: CT
+          assert:
+            path: StudyInstanceUID
+            exists: true
+          severity: error
+          message: CT instances must include StudyInstanceUID
+
+dicom_templates:
+  secondary-capture:
+    tags:
+      PatientName: ANON^PATIENT
+      PatientID: ANON
+      StudyDescription: Converted image
+      Modality: OT

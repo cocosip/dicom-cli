@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const VersionV1 = "v1"
+const (
+	VersionV1      = "v1"
+	DefaultUIDRoot = "1.2.156.112618"
+)
 
 // Config contains the runtime settings stored in dicom-cli configuration files.
 type Config struct {
@@ -66,6 +69,7 @@ type AuthConfig struct {
 func DefaultConfig() Config {
 	return Config{
 		Version: VersionV1,
+		UIDRoot: DefaultUIDRoot,
 		Timeouts: Timeouts{
 			Connect:   10 * time.Second,
 			Associate: 30 * time.Second,

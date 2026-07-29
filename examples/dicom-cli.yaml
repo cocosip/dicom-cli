@@ -1,0 +1,35 @@
+# Copy this file to dicom-cli.yaml and replace the example target values.
+version: v1
+uid: 1.2.156.112618
+
+timeouts:
+  connect: 10s
+  associate: 30s
+  idle: 5m
+
+targets:
+  local-pacs:
+    host: pacs.example.test
+    port: 11112
+    calling_ae: DICOMCLI
+    called_ae: PACS
+    timeouts:
+      connect: 15s
+      associate: 45s
+      idle: 5m
+    # These fields are retained for future transport support. P1 uses plain TCP.
+    tls:
+      enabled: false
+      server_name: ""
+      insecure_skip_verify: false
+      ca_file: ""
+      cert_file: ""
+      key_file: ""
+    proxy:
+      url: ""
+      username: ""
+      password: ""
+    auth:
+      username: ""
+      password: ""
+      token: ""
