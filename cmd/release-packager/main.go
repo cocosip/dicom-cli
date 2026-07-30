@@ -78,7 +78,7 @@ func packageRelease(version, output string) error {
 	if err != nil {
 		return fmt.Errorf("create staging directory: %w", err)
 	}
-	defer os.RemoveAll(staging)
+	defer func() { _ = os.RemoveAll(staging) }()
 
 	for _, target := range releaseTargets {
 		if err := packageTarget(root, staging, output, version, target); err != nil {
@@ -94,7 +94,12 @@ func normalizeVersion(version string) (string, error) {
 		return "", errors.New("--version is required")
 	}
 	for _, character := range version {
-		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character == '.' || character == '-') {
+		switch {
+		case character >= '0' && character <= '9':
+		case character >= 'a' && character <= 'z':
+		case character >= 'A' && character <= 'Z':
+		case character == '.' || character == '-':
+		default:
 			return "", fmt.Errorf("invalid release version %q", version)
 		}
 	}
@@ -157,7 +162,7 @@ func copyFile(source, destination string) error {
 	if err != nil {
 		return err
 	}
-	defer input.Close()
+	defer func() { _ = input.Close() }()
 
 	info, err := input.Stat()
 	if err != nil {
@@ -273,7 +278,7 @@ func copyArchiveFile(output io.Writer, path string) error {
 	if err != nil {
 		return err
 	}
-	defer input.Close()
+	defer func() { _ = input.Close() }()
 	_, err = io.Copy(output, input)
 	return err
 }
@@ -293,7 +298,7 @@ func zipEntries(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer archive.Close()
+	defer func() { _ = archive.Close() }()
 	entries := make([]string, 0, len(archive.File))
 	for _, file := range archive.File {
 		if !file.FileInfo().IsDir() {
@@ -309,12 +314,12 @@ func tarGzEntries(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer input.Close()
+	defer func() { _ = input.Close() }()
 	gzipReader, err := gzip.NewReader(input)
 	if err != nil {
 		return nil, err
 	}
-	defer gzipReader.Close()
+	defer func() { _ = gzipReader.Close() }()
 	archive := tar.NewReader(gzipReader)
 	var entries []string
 	for {
@@ -325,7 +330,7 @@ func tarGzEntries(path string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeRegA {
+		if header.Typeflag == tar.TypeReg {
 			entries = append(entries, header.Name)
 		}
 	}

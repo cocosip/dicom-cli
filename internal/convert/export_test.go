@@ -14,6 +14,7 @@ import (
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
+	"github.com/cocosip/go-dicom/pkg/dicom/vr"
 )
 
 func TestExportFrameSelectsRequestedFrameAndPreserves16BitPNG(t *testing.T) {
@@ -63,7 +64,7 @@ func TestTranscodeRetainsDatasetValuesAndChangesTransferSyntax(t *testing.T) {
 	}
 }
 
-func TestExportFrameScalesHighBitGrayscaleForJPEG(t *testing.T) {
+func TestExportFrameAppliesWindowForJPEG(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -86,8 +87,45 @@ func TestExportFrameScalesHighBitGrayscaleForJPEG(t *testing.T) {
 	}
 	first := color.GrayModel.Convert(imageValue.At(0, 0)).(color.Gray).Y
 	second := color.GrayModel.Convert(imageValue.At(1, 0)).(color.Gray).Y
-	if first > 5 || second < 250 {
-		t.Fatalf("JPEG samples = %d, %d, want approximately 0, 255", first, second)
+	if first < 95 || first > 110 || second < 250 {
+		t.Fatalf("JPEG samples = %d, %d, want approximately 102, 255", first, second)
+	}
+}
+
+func TestExportFrameAppliesCTRescaleAndWindowForJPEG(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parser.ParseFile(fixtures.SingleFrame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range []element.Element{
+		element.NewUnsignedShort(tag.PixelRepresentation, []uint16{1}),
+		element.NewString(tag.RescaleSlope, vr.DS, []string{"1"}),
+		element.NewString(tag.RescaleIntercept, vr.DS, []string{"-1024"}),
+		element.NewString(tag.WindowCenter, vr.DS, []string{"0"}),
+		element.NewString(tag.WindowWidth, vr.DS, []string{"500"}),
+		element.NewOtherWord(tag.PixelData, []byte{0x00, 0x04, 0xfa, 0x04}),
+	} {
+		if err := parsed.Dataset.AddOrUpdate(item); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	content, err := ExportFrame(parsed.Dataset, parsed.TransferSyntax, 0, JPEG)
+	if err != nil {
+		t.Fatalf("ExportFrame() error = %v", err)
+	}
+	imageValue, err := jpeg.Decode(bytes.NewReader(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+	middle := color.GrayModel.Convert(imageValue.At(0, 0)).(color.Gray).Y
+	high := color.GrayModel.Convert(imageValue.At(1, 0)).(color.Gray).Y
+	if middle < 100 || middle > 155 || high < 245 {
+		t.Fatalf("JPEG samples = %d, %d, want approximately 128, 255", middle, high)
 	}
 }
 

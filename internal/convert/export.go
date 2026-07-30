@@ -10,12 +10,17 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"math"
+	"strconv"
+	"strings"
 
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/serialization"
+	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 	"github.com/cocosip/go-dicom/pkg/imaging"
 	"github.com/cocosip/go-dicom/pkg/imaging/codec"
+	"github.com/cocosip/go-dicom/pkg/imaging/render"
 )
 
 // ImageFormat is an image format supported by DICOM frame export.
@@ -26,9 +31,12 @@ const (
 	JPEG ImageFormat = "jpeg"
 )
 
-// ExportFrame encodes a zero-indexed DICOM frame without applying display
-// transforms such as windowing, LUTs, or rescale slope/intercept.
+// ExportFrame encodes a zero-indexed DICOM frame. JPEG grayscale output uses
+// the DICOM rescale and window settings so it is suitable for display.
 func ExportFrame(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, format ImageFormat) ([]byte, error) {
+	if format == JPEG {
+		return exportJPEG(ds, syntax, frame)
+	}
 	imageValue, err := frameImage(ds, syntax, frame, format == JPEG)
 	if err != nil {
 		return nil, err
@@ -37,8 +45,6 @@ func ExportFrame(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, format
 	switch format {
 	case PNG:
 		err = png.Encode(&content, imageValue)
-	case JPEG:
-		err = jpeg.Encode(&content, imageValue, &jpeg.Options{Quality: 95})
 	default:
 		return nil, fmt.Errorf("unsupported image format %q", format)
 	}
@@ -46,6 +52,113 @@ func ExportFrame(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, format
 		return nil, err
 	}
 	return content.Bytes(), nil
+}
+
+func exportJPEG(ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte, error) {
+	pixelData, err := imaging.CreatePixelData(ds)
+	if err != nil {
+		return nil, err
+	}
+	if frame < 0 || frame >= pixelData.FrameCount() {
+		return nil, fmt.Errorf("frame %d is outside [0, %d)", frame, pixelData.FrameCount())
+	}
+	if pixelData.Info.SamplesPerPixel != 1 {
+		imageValue, err := frameImage(ds, syntax, frame, false)
+		if err != nil {
+			return nil, err
+		}
+		var content bytes.Buffer
+		if err := jpeg.Encode(&content, imageValue, &jpeg.Options{Quality: 95}); err != nil {
+			return nil, err
+		}
+		return content.Bytes(), nil
+	}
+
+	raw, err := decodedFrame(ds, syntax, pixelData, frame)
+	if err != nil {
+		return nil, err
+	}
+	slope, intercept, center, width, err := grayscaleDisplaySettings(ds, pixelData.Info)
+	if err != nil {
+		return nil, err
+	}
+	minInput, maxInput := grayscaleRange(pixelData.Info.BitsStored, pixelData.Info.PixelRepresentation == imaging.SignedPixels)
+	pipeline := render.NewGrayscalePipeline(slope, intercept, center, width, minInput, maxInput, false)
+	exporter := render.NewImageExporter(pipeline)
+	photometric := "MONOCHROME2"
+	if pixelData.Info.PhotometricInterpretation != nil {
+		photometric = pixelData.Info.PhotometricInterpretation.Value
+	}
+	var content bytes.Buffer
+	err = exporter.ExportGrayscale(
+		&content,
+		raw,
+		int(pixelData.Info.Width),
+		int(pixelData.Info.Height),
+		int(pixelData.Info.BitsAllocated),
+		int(pixelData.Info.BitsStored),
+		pixelData.Info.PixelRepresentation == imaging.SignedPixels,
+		photometric,
+		&render.ExportOptions{Format: render.FormatJPEG, JPEGQuality: 95},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return content.Bytes(), nil
+}
+
+func grayscaleDisplaySettings(ds *dataset.Dataset, info *imaging.PixelDataInfo) (slope, intercept, center, width float64, err error) {
+	slope, err = dicomDecimal(ds, tag.RescaleSlope, 1)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	intercept, err = dicomDecimal(ds, tag.RescaleIntercept, 0)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	minInput, maxInput := grayscaleRange(info.BitsStored, info.PixelRepresentation == imaging.SignedPixels)
+	minOutput := minInput*slope + intercept
+	maxOutput := maxInput*slope + intercept
+	if minOutput > maxOutput {
+		minOutput, maxOutput = maxOutput, minOutput
+	}
+	center = (minOutput + maxOutput) / 2
+	width = maxOutput - minOutput + 1
+	center, err = dicomDecimal(ds, tag.WindowCenter, center)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	width, err = dicomDecimal(ds, tag.WindowWidth, width)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	if width < 1 {
+		return 0, 0, 0, 0, fmt.Errorf("WindowWidth must be at least 1")
+	}
+	return slope, intercept, center, width, nil
+}
+
+func grayscaleRange(bitsStored uint16, signed bool) (float64, float64) {
+	if bitsStored == 0 || bitsStored > 16 {
+		bitsStored = 16
+	}
+	if signed {
+		maximum := float64((uint32(1) << (bitsStored - 1)) - 1)
+		return -maximum - 1, maximum
+	}
+	return 0, float64((uint32(1) << bitsStored) - 1)
+}
+
+func dicomDecimal(ds *dataset.Dataset, field *tag.Tag, fallback float64) (float64, error) {
+	value, ok := ds.GetString(field)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+		return 0, fmt.Errorf("invalid %s value %q", field, value)
+	}
+	return parsed, nil
 }
 
 // ExportJSON produces DICOM JSON. PixelData is summarized unless callers
