@@ -85,6 +85,28 @@ func TestExecuteConvertDICOMGroupsDirectoryUIDs(t *testing.T) {
 	}
 }
 
+func TestExecuteConvertToDICOMUsesImageEncapsulationPath(t *testing.T) {
+	input := filepath.Join(t.TempDir(), "input.png")
+	file, err := os.Create(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(file, image.NewGray(image.Rect(0, 0, 1, 1))); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output.dcm")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"convert", "--to", "dicom", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("convert --to dicom exit code = %d, want 0", code)
+	}
+	if _, err := parser.ParseFile(output); err != nil {
+		t.Fatalf("parse output: %v", err)
+	}
+}
+
 func TestExecuteConvertImageRejectsMultipleFramesToStdout(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {

@@ -27,19 +27,28 @@ type dicomExportOptions struct {
 
 func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 	options := dicomExportOptions{format: "png"}
+	var patientName string
+	var recursive, failFast, flatten bool
 	command := &cobra.Command{
 		Use:   "convert <input>",
 		Short: "Convert DICOM images and metadata",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
+			if strings.EqualFold(options.format, "dicom") {
+				return runImageToDICOM(runtime, args[0], patientName, options.destination, recursive, failFast, flatten)
+			}
 			return runDICOMExport(runtime, args[0], options)
 		},
 	}
-	command.Flags().StringVar(&options.format, "to", "", "output format: png, jpeg, or json")
+	command.Flags().StringVar(&options.format, "to", "", "output format: png, jpeg, json, or dicom")
 	command.Flags().StringVarP(&options.destination, "output", "o", "", "output file, directory, or -")
 	command.Flags().IntVar(&options.frame, "frame", 0, "one-based frame number")
 	command.Flags().BoolVar(&options.allFrames, "all-frames", false, "export every image frame")
 	command.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, "include PixelData bytes in JSON")
+	command.Flags().StringVar(&patientName, "patient-name", "", "required PatientName for DICOM output")
+	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories for DICOM output")
+	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first DICOM output failure")
+	command.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure for DICOM output")
 
 	imageCommand := &cobra.Command{
 		Use:   "image <input>",
@@ -66,8 +75,7 @@ func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", "output file or -")
 	jsonCommand.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, "include PixelData bytes")
 
-	var patientName, destination string
-	var recursive, failFast, flatten bool
+	var destination string
 	dicomCommand := &cobra.Command{
 		Use:   "dicom <input>",
 		Short: "Encapsulate PNG or JPEG images as Secondary Capture DICOM",
