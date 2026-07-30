@@ -2,12 +2,18 @@ package main
 
 import (
 	"bytes"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cocosip/dicom-cli/internal/testutil"
+	"github.com/cocosip/go-dicom/pkg/dicom/parser"
+	"github.com/cocosip/go-dicom/pkg/dicom/tag"
+	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 )
 
 func TestExecuteConvertImageAndJSONUseSharedDICOMExport(t *testing.T) {
@@ -33,6 +39,49 @@ func TestExecuteConvertImageAndJSONUseSharedDICOMExport(t *testing.T) {
 	jsonContent, err := os.ReadFile(jsonPath)
 	if err != nil || !strings.Contains(string(jsonContent), `"summary"`) {
 		t.Fatalf("JSON output = %q, err=%v", jsonContent, err)
+	}
+}
+
+func TestExecuteConvertDICOMGroupsDirectoryUIDs(t *testing.T) {
+	input := t.TempDir()
+	for _, name := range []string{"one.png", "two.png"} {
+		file, err := os.Create(filepath.Join(input, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		imageValue := image.NewGray(image.Rect(0, 0, 1, 1))
+		imageValue.SetGray(0, 0, color.Gray{Y: 127})
+		if err := png.Encode(file, imageValue); err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	output := filepath.Join(t.TempDir(), "output")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"convert", "dicom", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("convert dicom exit code = %d, want 0", code)
+	}
+	first, err := parser.ParseFile(filepath.Join(output, "one.dcm"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := parser.ParseFile(filepath.Join(output, "two.dcm"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstStudy, _ := first.Dataset.GetString(tag.StudyInstanceUID)
+	secondStudy, _ := second.Dataset.GetString(tag.StudyInstanceUID)
+	firstSeries, _ := first.Dataset.GetString(tag.SeriesInstanceUID)
+	secondSeries, _ := second.Dataset.GetString(tag.SeriesInstanceUID)
+	firstSOP, _ := first.Dataset.GetString(tag.SOPInstanceUID)
+	secondSOP, _ := second.Dataset.GetString(tag.SOPInstanceUID)
+	if firstStudy == "" || firstStudy != secondStudy || firstSeries == "" || firstSeries != secondSeries || firstSOP == secondSOP {
+		t.Fatalf("UIDs first=(%q,%q,%q) second=(%q,%q,%q)", firstStudy, firstSeries, firstSOP, secondStudy, secondSeries, secondSOP)
+	}
+	if first.TransferSyntax != transfer.ExplicitVRLittleEndian {
+		t.Fatalf("transfer syntax = %s, want Explicit VR Little Endian", first.TransferSyntax.UID())
 	}
 }
 

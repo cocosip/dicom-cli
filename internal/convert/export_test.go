@@ -13,6 +13,7 @@ import (
 	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
+	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 )
 
 func TestExportFrameSelectsRequestedFrameAndPreserves16BitPNG(t *testing.T) {
@@ -38,6 +39,27 @@ func TestExportFrameSelectsRequestedFrameAndPreserves16BitPNG(t *testing.T) {
 	}
 	if got := color.Gray16Model.Convert(imageValue.At(0, 0)).(color.Gray16).Y; got != 2 {
 		t.Fatalf("frame 2 first pixel = %d, want 2", got)
+	}
+}
+
+func TestTranscodeRetainsDatasetValuesAndChangesTransferSyntax(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parser.ParseFile(fixtures.SingleFrame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	converted, err := Transcode(parsed.Dataset, parsed.TransferSyntax, transfer.ImplicitVRLittleEndian)
+	if err != nil {
+		t.Fatalf("Transcode() error = %v", err)
+	}
+	if converted.InternalTransferSyntax() != transfer.ImplicitVRLittleEndian {
+		t.Fatalf("transfer syntax = %v, want Implicit VR Little Endian", converted.InternalTransferSyntax())
+	}
+	if got, _ := converted.GetString(tag.PatientID); got != "SYNTHETIC" {
+		t.Fatalf("PatientID = %q, want retained value", got)
 	}
 }
 

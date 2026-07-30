@@ -10,7 +10,11 @@ import (
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	convertpkg "github.com/cocosip/dicom-cli/internal/convert"
+	"github.com/cocosip/dicom-cli/internal/files"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
+	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
+	"github.com/cocosip/go-dicom/pkg/dicom/uid"
+	"github.com/cocosip/go-dicom/pkg/dicom/writer"
 )
 
 type dicomExportOptions struct {
@@ -62,8 +66,92 @@ func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", "output file or -")
 	jsonCommand.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, "include PixelData bytes")
 
-	command.AddCommand(imageCommand, jsonCommand)
+	var patientName, destination string
+	var recursive, failFast, flatten bool
+	dicomCommand := &cobra.Command{
+		Use:   "dicom <input>",
+		Short: "Encapsulate PNG or JPEG images as Secondary Capture DICOM",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runImageToDICOM(runtime, args[0], patientName, destination, recursive, failFast, flatten)
+		},
+	}
+	dicomCommand.Flags().StringVar(&patientName, "patient-name", "", "required PatientName for created DICOM files")
+	dicomCommand.Flags().StringVarP(&destination, "output", "o", "", "DICOM output file or directory")
+	dicomCommand.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
+	dicomCommand.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")
+	dicomCommand.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure")
+
+	command.AddCommand(imageCommand, jsonCommand, dicomCommand)
 	return command
+}
+
+func runImageToDICOM(runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool) error {
+	if patientName == "" {
+		return apperr.Wrap(apperr.KindInput, fmt.Errorf("--patient-name is required"))
+	}
+	info, err := os.Stat(input)
+	if err != nil {
+		return apperr.Wrap(apperr.KindOperation, err)
+	}
+	if destination == "" {
+		workingDirectory, err := runtime.Getwd()
+		if err != nil {
+			return err
+		}
+		destination = files.DefaultOutputDirectory(workingDirectory, "convert")
+	}
+	if !info.IsDir() && destination != "" && filepath.Ext(destination) == "" {
+		return apperr.Wrap(apperr.KindInput, fmt.Errorf("single image output must be a .dcm file"))
+	}
+	entries, err := files.Scan(input, recursive, func(path string) (bool, string, error) {
+		extension := strings.ToLower(filepath.Ext(path))
+		if extension != ".png" && extension != ".jpg" && extension != ".jpeg" {
+			return false, "unsupported image extension", nil
+		}
+		return true, "", nil
+	})
+	if err != nil {
+		return apperr.Wrap(apperr.KindOperation, err)
+	}
+	studyUID := uid.GenerateDerivedFromUUID().UID()
+	seriesUID := uid.GenerateDerivedFromUUID().UID()
+	failed := 0
+	for _, entry := range entries {
+		if entry.Skipped {
+			continue
+		}
+		imageValue, err := convertpkg.LoadImage(entry.Path)
+		if err == nil {
+			dataset, buildErr := convertpkg.NewSecondaryCapture(imageValue, convertpkg.SecondaryCaptureOptions{PatientName: patientName, StudyUID: studyUID, SeriesUID: seriesUID})
+			if buildErr != nil {
+				err = buildErr
+			} else {
+				outputPath := destination
+				if info.IsDir() {
+					outputPath, err = files.OutputPath(entry.Path, input, destination, !flatten)
+					if err == nil {
+						outputPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".dcm"
+					}
+				}
+				if err == nil {
+					if err = os.MkdirAll(filepath.Dir(outputPath), 0o755); err == nil {
+						err = writer.WriteFile(outputPath, dataset, writer.WithTransferSyntax(transfer.ExplicitVRLittleEndian))
+					}
+				}
+			}
+		}
+		if err != nil {
+			failed++
+			if failFast {
+				break
+			}
+		}
+	}
+	if failed > 0 {
+		return apperr.Wrap(apperr.KindOperation, fmt.Errorf("convert dicom failed for %d file(s)", failed))
+	}
+	return nil
 }
 
 func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) error {

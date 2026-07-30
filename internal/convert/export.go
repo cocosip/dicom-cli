@@ -79,6 +79,20 @@ func FrameCount(ds *dataset.Dataset) (int, error) {
 	return pixelData.FrameCount(), nil
 }
 
+// Transcode converts dataset pixel data to target while preserving unrelated
+// dataset elements. The target syntax must be available in the process codec
+// registry.
+func Transcode(ds *dataset.Dataset, source, target *transfer.Syntax) (*dataset.Dataset, error) {
+	if source == nil || target == nil {
+		return nil, fmt.Errorf("source and target transfer syntaxes are required")
+	}
+	transcoder, err := codec.GetDefaultManager().CreateTranscoder(source, target)
+	if err != nil {
+		return nil, err
+	}
+	return transcoder.Transcode(ds)
+}
+
 func frameImage(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, jpegTarget bool) (image.Image, error) {
 	pixelData, err := imaging.CreatePixelData(ds)
 	if err != nil {
