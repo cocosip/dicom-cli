@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cocosip/dicom-cli/internal/edit"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
@@ -137,4 +138,19 @@ func NewSecondaryCapture(imageValue ImportedImage, options SecondaryCaptureOptio
 		}
 	}
 	return ds, nil
+}
+
+// ApplyMetadata merges metadata sources in order. Later sources override an
+// earlier value for the same DICOM tag path.
+func ApplyMetadata(ds *dataset.Dataset, sources ...map[string]string) error {
+	for _, source := range sources {
+		operations := make([]edit.Operation, 0, len(source))
+		for path, value := range source {
+			operations = append(operations, edit.Operation{Kind: edit.Set, Path: path, Value: value})
+		}
+		if err := edit.Apply(ds, operations, edit.Options{}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

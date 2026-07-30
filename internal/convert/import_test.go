@@ -57,3 +57,20 @@ func TestNewSecondaryCaptureRequiresPatientNameAndBuildsImageDataset(t *testing.
 		t.Fatal("StudyInstanceUID is empty")
 	}
 }
+
+func TestApplyMetadataUsesLaterSourcesAsOverrides(t *testing.T) {
+	imageValue := ImportedImage{Width: 1, Height: 1, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 1, PhotometricInterpretation: "MONOCHROME2", PixelData: []byte{0}}
+	dataset, err := NewSecondaryCapture(imageValue, SecondaryCaptureOptions{PatientName: "SYNTHETIC^PATIENT"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyMetadata(dataset, map[string]string{"PatientID": "template", "PatientName": "TEMPLATE^PATIENT"}, map[string]string{"PatientID": "reference"}, map[string]string{"PatientName": "CLI^PATIENT"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := dataset.GetString(tag.PatientID); got != "reference" {
+		t.Fatalf("PatientID = %q, want reference", got)
+	}
+	if got, _ := dataset.GetString(tag.PatientName); got != "CLI^PATIENT" {
+		t.Fatalf("PatientName = %q, want CLI", got)
+	}
+}
