@@ -38,6 +38,25 @@ func TestLoadImageAccepts16BitGrayPNGAndRejectsUnsupportedExtension(t *testing.T
 	}
 }
 
+func TestLoadImageRejects16BitColorPNG(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "color16.png")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imageValue := image.NewNRGBA64(image.Rect(0, 0, 1, 1))
+	imageValue.SetNRGBA64(0, 0, color.NRGBA64{R: 0xffff, A: 0xffff})
+	if err := png.Encode(file, imageValue); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadImage(path); err == nil {
+		t.Fatal("LoadImage(16-bit color PNG) succeeded")
+	}
+}
+
 func TestNewSecondaryCaptureRequiresPatientNameAndBuildsImageDataset(t *testing.T) {
 	imageValue := ImportedImage{Width: 2, Height: 1, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 1, PhotometricInterpretation: "MONOCHROME2", PixelData: []byte{0, 255}}
 	if _, err := NewSecondaryCapture(imageValue, SecondaryCaptureOptions{}); err == nil {

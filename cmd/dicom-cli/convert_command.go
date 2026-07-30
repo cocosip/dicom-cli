@@ -12,6 +12,7 @@ import (
 	convertpkg "github.com/cocosip/dicom-cli/internal/convert"
 	"github.com/cocosip/dicom-cli/internal/files"
 	"github.com/cocosip/dicom-cli/internal/rules"
+	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
@@ -25,6 +26,9 @@ type dicomExportOptions struct {
 	frame            int
 	allFrames        bool
 	includePixelData bool
+	recursive        bool
+	failFast         bool
+	flatten          bool
 }
 
 func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
@@ -37,7 +41,7 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if strings.EqualFold(options.format, "dicom") {
-				return runImageToDICOMWithMetadata(runtime, root, args[0], patientName, templateName, referencePath, options.destination, recursive, failFast, flatten)
+				return runImageToDICOMWithMetadata(runtime, root, args[0], patientName, templateName, referencePath, options.destination, options.recursive, options.failFast, options.flatten)
 			}
 			return runDICOMExport(runtime, args[0], options)
 		},
@@ -50,9 +54,9 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	command.Flags().StringVar(&patientName, "patient-name", "", "required PatientName for DICOM output")
 	command.Flags().StringVar(&templateName, "template", "", "named DICOM template from rules")
 	command.Flags().StringVar(&referencePath, "reference", "", "reference DICOM metadata source")
-	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories for DICOM output")
-	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first DICOM output failure")
-	command.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure for DICOM output")
+	command.Flags().BoolVarP(&options.recursive, "recursive", "r", false, "scan subdirectories")
+	command.Flags().BoolVar(&options.failFast, "fail-fast", false, "stop after the first failure")
+	command.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
 
 	imageCommand := &cobra.Command{
 		Use:   "image <input>",
@@ -66,6 +70,9 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	imageCommand.Flags().StringVarP(&options.destination, "output", "o", "", "output file, directory, or -")
 	imageCommand.Flags().IntVar(&options.frame, "frame", 0, "one-based frame number")
 	imageCommand.Flags().BoolVar(&options.allFrames, "all-frames", false, "export every image frame")
+	imageCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, "scan subdirectories")
+	imageCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, "stop after the first file failure")
+	imageCommand.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
 
 	jsonCommand := &cobra.Command{
 		Use:   "json <input>",
@@ -78,6 +85,9 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	}
 	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", "output file or -")
 	jsonCommand.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, "include PixelData bytes")
+	jsonCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, "scan subdirectories")
+	jsonCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, "stop after the first file failure")
+	jsonCommand.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
 
 	var destination string
 	dicomCommand := &cobra.Command{
@@ -108,9 +118,11 @@ func runImageToDICOMWithMetadata(runtime Runtime, root *rootOptions, input, pati
 	return runImageToDICOM(runtime, input, patientName, destination, recursive, failFast, flatten, template, reference)
 }
 
-func runImageToDICOM(runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool, template, reference map[string]string) error {
+func runImageToDICOM(runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool, template map[string]string, reference *dataset.Dataset) error {
 	if patientName == "" {
-		patientName = reference["PatientName"]
+		if reference != nil {
+			patientName, _ = reference.GetString(tag.PatientName)
+		}
 		if patientName == "" {
 			patientName = template["PatientName"]
 		}
@@ -153,7 +165,15 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 		if err == nil {
 			dataset, buildErr := convertpkg.NewSecondaryCapture(imageValue, convertpkg.SecondaryCaptureOptions{PatientName: patientName, StudyUID: studyUID, SeriesUID: seriesUID})
 			if buildErr == nil {
-				buildErr = convertpkg.ApplyMetadata(dataset, template, reference, map[string]string{"PatientName": patientName})
+				generated := dataset.Clone()
+				buildErr = convertpkg.ApplyMetadata(dataset, template)
+				if buildErr == nil && reference != nil {
+					dataset.Merge(reference, true)
+				}
+				if buildErr == nil {
+					dataset.Merge(generated, true)
+					buildErr = convertpkg.ApplyMetadata(dataset, map[string]string{"PatientName": patientName})
+				}
 			}
 			if buildErr != nil {
 				err = buildErr
@@ -162,7 +182,7 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 				if info.IsDir() {
 					outputPath, err = files.OutputPath(entry.Path, input, destination, !flatten)
 					if err == nil {
-						outputPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".dcm"
+						outputPath, err = convertedDICOMOutputPath(outputPath)
 					}
 				}
 				if err == nil {
@@ -185,7 +205,25 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 	return nil
 }
 
-func imageMetadataSources(runtime Runtime, configuredRules, templateName, referencePath string) (map[string]string, map[string]string, error) {
+func convertedDICOMOutputPath(path string) (string, error) {
+	path = strings.TrimSuffix(path, filepath.Ext(path)) + ".dcm"
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return path, nil
+	} else if err != nil {
+		return "", err
+	}
+	base := strings.TrimSuffix(path, ".dcm")
+	for index := 1; ; index++ {
+		candidate := fmt.Sprintf("%s-%d.dcm", base, index)
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+}
+
+func imageMetadataSources(runtime Runtime, configuredRules, templateName, referencePath string) (map[string]string, *dataset.Dataset, error) {
 	template := map[string]string{}
 	if templateName != "" {
 		path, err := rulesPath(runtime, configuredRules, nil)
@@ -202,27 +240,15 @@ func imageMetadataSources(runtime Runtime, configuredRules, templateName, refere
 		}
 		template = selected.Tags
 	}
-	reference := map[string]string{}
+	var reference *dataset.Dataset
 	if referencePath != "" {
 		parsed, err := parser.ParseFile(referencePath)
 		if err != nil {
 			return nil, nil, err
 		}
-		for _, path := range []string{"PatientName", "PatientID", "StudyInstanceUID", "SeriesInstanceUID"} {
-			if value, ok := parsed.Dataset.GetString(elementTag(path)); ok && value != "" {
-				reference[path] = value
-			}
-		}
+		reference = parsed.Dataset.Clone()
 	}
 	return template, reference, nil
-}
-
-func elementTag(keyword string) *tag.Tag {
-	parsed, err := tag.ParseKeyword(keyword)
-	if err != nil {
-		return nil
-	}
-	return &parsed
 }
 
 func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) error {
@@ -242,11 +268,68 @@ func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) e
 	if options.allFrames && options.destination == "-" {
 		return apperr.Wrap(apperr.KindInput, fmt.Errorf("binary stdout requires exactly one result"))
 	}
-	if info, err := os.Stat(input); err != nil {
+	info, err := os.Stat(input)
+	if err != nil {
 		return apperr.Wrap(apperr.KindOperation, err)
-	} else if info.IsDir() {
-		return apperr.Wrap(apperr.KindInput, fmt.Errorf("convert export requires a DICOM file"))
 	}
+	if info.IsDir() {
+		return runDICOMExportDirectory(runtime, input, format, options)
+	}
+	return runDICOMExportFile(runtime, input, format, options, options.destination)
+}
+
+func runDICOMExportDirectory(runtime Runtime, input, format string, options dicomExportOptions) error {
+	if options.destination == "-" {
+		return apperr.Wrap(apperr.KindInput, fmt.Errorf("binary stdout requires exactly one input file"))
+	}
+	destination := options.destination
+	if destination == "" {
+		workingDirectory, err := runtime.Getwd()
+		if err != nil {
+			return err
+		}
+		destination = files.DefaultOutputDirectory(workingDirectory, "convert")
+	}
+	entries, err := files.Scan(input, options.recursive, func(path string) (bool, string, error) {
+		if strings.EqualFold(filepath.Ext(path), ".dcm") {
+			return true, "", nil
+		}
+		return false, "unsupported DICOM extension", nil
+	})
+	if err != nil {
+		return apperr.Wrap(apperr.KindOperation, err)
+	}
+	failed := 0
+	for _, entry := range entries {
+		if entry.Skipped {
+			continue
+		}
+		if err := runDICOMExportFile(runtime, entry.Path, format, options, destinationForDICOMExport(entry.Path, input, destination, format, options)); err != nil {
+			failed++
+			if options.failFast {
+				break
+			}
+		}
+	}
+	if failed > 0 {
+		return apperr.Wrap(apperr.KindOperation, fmt.Errorf("convert export failed for %d file(s)", failed))
+	}
+	return nil
+}
+
+func destinationForDICOMExport(path, root, destination, format string, options dicomExportOptions) string {
+	preserve := !options.flatten
+	name, err := files.OutputPath(path, root, destination, preserve)
+	if err != nil {
+		return ""
+	}
+	if options.allFrames {
+		return filepath.Dir(name)
+	}
+	return strings.TrimSuffix(name, filepath.Ext(name)) + "." + format
+}
+
+func runDICOMExportFile(runtime Runtime, input, format string, options dicomExportOptions, destination string) error {
 	parsed, err := parser.ParseFile(input)
 	if err != nil {
 		return apperr.Wrap(apperr.KindOperation, err)
@@ -256,7 +339,7 @@ func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) e
 		if err != nil {
 			return apperr.Wrap(apperr.KindOperation, err)
 		}
-		return writeExport(runtime, input, options.destination, "json", content)
+		return writeExport(runtime, input, destination, "json", content)
 	}
 	frameCount, err := convertpkg.FrameCount(parsed.Dataset)
 	if err != nil {
@@ -272,8 +355,15 @@ func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) e
 			frames[index] = index
 		}
 	}
-	if len(frames) > 1 && options.destination != "" {
-		if err := os.MkdirAll(options.destination, 0o755); err != nil {
+	if len(frames) > 1 && destination == "" {
+		workingDirectory, err := runtime.Getwd()
+		if err != nil {
+			return err
+		}
+		destination = files.DefaultOutputDirectory(workingDirectory, "convert")
+	}
+	if len(frames) > 1 && destination != "" {
+		if err := os.MkdirAll(destination, 0o755); err != nil {
 			return apperr.Wrap(apperr.KindOperation, err)
 		}
 	}
@@ -282,11 +372,11 @@ func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) e
 		if err != nil {
 			return apperr.Wrap(apperr.KindOperation, err)
 		}
-		destination := options.destination
+		frameDestination := destination
 		if len(frames) > 1 {
-			destination = filepath.Join(options.destination, frameOutputName(input, format, frame))
+			frameDestination = filepath.Join(destination, frameOutputName(input, format, frame))
 		}
-		if err := writeExport(runtime, input, destination, format, content); err != nil {
+		if err := writeExport(runtime, input, frameDestination, format, content); err != nil {
 			return err
 		}
 	}

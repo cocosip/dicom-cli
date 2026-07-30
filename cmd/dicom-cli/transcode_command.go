@@ -66,6 +66,9 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				}
 				failed := 0
 				for _, entry := range entries {
+					if entry.Skipped {
+						continue
+					}
 					outputPath, pathErr := files.OutputPath(entry.Path, args[0], destination, !flatten)
 					if pathErr == nil {
 						pathErr = transcodeFile(entry.Path, outputPath, format.Syntax)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -11,9 +12,12 @@ import (
 	"testing"
 
 	"github.com/cocosip/dicom-cli/internal/testutil"
+	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
+	"github.com/cocosip/go-dicom/pkg/dicom/vr"
+	"github.com/cocosip/go-dicom/pkg/dicom/writer"
 )
 
 func TestExecuteConvertImageAndJSONUseSharedDICOMExport(t *testing.T) {
@@ -128,11 +132,14 @@ func TestExecuteConvertDICOMMergesTemplateReferenceAndCLI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	content, err := os.ReadFile(fixtures.SingleFrame)
+	referenceDataset, err := parser.ParseFile(fixtures.SingleFrame)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(reference, content, 0o600); err != nil {
+	if err := referenceDataset.Dataset.AddOrUpdate(element.NewString(tag.StudyDescription, vr.LO, []string{"REFERENCE STUDY"})); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.WriteFile(reference, referenceDataset.Dataset, writer.WithTransferSyntax(referenceDataset.TransferSyntax)); err != nil {
 		t.Fatal(err)
 	}
 	output := filepath.Join(t.TempDir(), "output.dcm")
@@ -149,6 +156,9 @@ func TestExecuteConvertDICOMMergesTemplateReferenceAndCLI(t *testing.T) {
 	}
 	if got, _ := parsed.Dataset.GetString(tag.PatientID); got != "SYNTHETIC" {
 		t.Fatalf("PatientID = %q, want reference override", got)
+	}
+	if got, _ := parsed.Dataset.GetString(tag.StudyDescription); got != "REFERENCE STUDY" {
+		t.Fatalf("StudyDescription = %q, want reference metadata", got)
 	}
 }
 
@@ -176,6 +186,90 @@ func TestExecuteConvertImageAllFramesUsesDeterministicNames(t *testing.T) {
 	for _, name := range []string{"multi-frame-frame-0001.png", "multi-frame-frame-0002.png"} {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("frame output %s: %v", name, err)
+		}
+	}
+}
+
+func TestExecuteConvertImageAllFramesUsesDefaultConvertDirectory(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	runtime, _, _ := testRuntime()
+	runtime.Getwd = func() (string, error) { return workingDirectory, nil }
+	if code := Execute([]string{"convert", "image", "--all-frames", fixtures.MultiFrame}, runtime); code != 0 {
+		t.Fatalf("convert image exit code = %d, want 0", code)
+	}
+	for _, name := range []string{"multi-frame-frame-0001.png", "multi-frame-frame-0002.png"} {
+		if _, err := os.Stat(filepath.Join(workingDirectory, "convert", name)); err != nil {
+			t.Fatalf("default frame output %s: %v", name, err)
+		}
+	}
+}
+
+func TestExecuteConvertImageExportsDICOMDirectory(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := filepath.Join(t.TempDir(), "input")
+	if err := os.MkdirAll(input, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"one.dcm", "two.dcm"} {
+		content, readErr := os.ReadFile(fixtures.SingleFrame)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if writeErr := os.WriteFile(filepath.Join(input, name), content, 0o600); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	output := filepath.Join(t.TempDir(), "output")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"convert", "image", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("convert image directory exit code = %d, want 0", code)
+	}
+	for _, name := range []string{"one.png", "two.png"} {
+		content, readErr := os.ReadFile(filepath.Join(output, name))
+		if readErr != nil || !bytes.HasPrefix(content, []byte("\x89PNG")) {
+			t.Fatalf("PNG output %s = %q, err=%v", name, content, readErr)
+		}
+	}
+}
+
+func TestExecuteConvertDICOMDisambiguatesSameStemImageNames(t *testing.T) {
+	input := t.TempDir()
+	imageValue := image.NewGray(image.Rect(0, 0, 1, 1))
+	pngFile, err := os.Create(filepath.Join(input, "image.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(pngFile, imageValue); err != nil {
+		t.Fatal(err)
+	}
+	if err := pngFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+	jpegFile, err := os.Create(filepath.Join(input, "image.jpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jpeg.Encode(jpegFile, imageValue, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := jpegFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"convert", "dicom", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("convert dicom exit code = %d, want 0", code)
+	}
+	for _, name := range []string{"image.dcm", "image-1.dcm"} {
+		if _, err := parser.ParseFile(filepath.Join(output, name)); err != nil {
+			t.Fatalf("parse %s: %v", name, err)
 		}
 	}
 }

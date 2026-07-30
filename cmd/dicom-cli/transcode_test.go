@@ -55,6 +55,34 @@ func TestExecuteTranscodeDirectoryWritesAllDICOMFiles(t *testing.T) {
 	}
 }
 
+func TestExecuteTranscodeDirectorySkipsFilesOutsideFilter(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := t.TempDir()
+	content, err := os.ReadFile(fixtures.SingleFrame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(input, "one.dcm"), content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rulesPath := filepath.Join(t.TempDir(), "rules.yaml")
+	rules := "version: v1\nfilters:\n  exclude_all:\n    path: PatientID\n    equals: OTHER\n"
+	if err := os.WriteFile(rulesPath, []byte(rules), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"transcode", "--rules", rulesPath, "--filter", "exclude_all", "--to", "implicit-vr-little-endian", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("filtered directory transcode exit code = %d, want 0", code)
+	}
+	if _, err := os.Stat(filepath.Join(output, "one.dcm")); !os.IsNotExist(err) {
+		t.Fatalf("filtered output exists or stat failed: %v", err)
+	}
+}
+
 func TestExecuteTranscodeRoundTripsRLE(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {

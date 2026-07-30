@@ -75,6 +75,9 @@ func importedPixels(imageValue image.Image, format string) (ImportedImage, error
 		}
 		return ImportedImage{Width: width, Height: height, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 1, PhotometricInterpretation: "MONOCHROME2", PixelData: data}, nil
 	}
+	if is16BitColorImage(imageValue) {
+		return ImportedImage{}, fmt.Errorf("16-bit color images are not supported")
+	}
 	data := make([]byte, width*height*3)
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
@@ -84,6 +87,15 @@ func importedPixels(imageValue image.Image, format string) (ImportedImage, error
 		}
 	}
 	return ImportedImage{Width: width, Height: height, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 3, PhotometricInterpretation: "RGB", PixelData: data}, nil
+}
+
+func is16BitColorImage(imageValue image.Image) bool {
+	switch imageValue.(type) {
+	case *image.RGBA64, *image.NRGBA64, *image.Alpha16, *image.CMYK:
+		return true
+	default:
+		return false
+	}
 }
 
 // SecondaryCaptureOptions contains values not inferable from the image.
