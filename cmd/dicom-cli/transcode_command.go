@@ -12,13 +12,14 @@ import (
 	convertpkg "github.com/cocosip/dicom-cli/internal/convert"
 	"github.com/cocosip/dicom-cli/internal/dicom"
 	"github.com/cocosip/dicom-cli/internal/files"
+	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 	"github.com/cocosip/go-dicom/pkg/dicom/writer"
 )
 
-func newTranscodeCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
-	var target, destination string
+func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	var target, destination, filterName string
 	var recursive, failFast, flatten bool
 	command := &cobra.Command{
 		Use:   "transcode <file>",
@@ -43,7 +44,23 @@ func newTranscodeCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
 			if inputInfo.IsDir() {
-				entries, err := files.Scan(args[0], recursive, func(string) (bool, string, error) { return true, "", nil })
+				condition, err := loadTranscodeFilter(runtime, root.rulesPath, filterName)
+				if err != nil {
+					return apperr.Wrap(apperr.KindInput, err)
+				}
+				entries, err := files.Scan(args[0], recursive, func(path string) (bool, string, error) {
+					if condition == nil {
+						return true, "", nil
+					}
+					parsed, parseErr := parser.ParseFile(path)
+					if parseErr != nil {
+						return true, "", nil
+					}
+					if matchCondition(parsed.Dataset, *condition) {
+						return true, "", nil
+					}
+					return false, "filter did not match", nil
+				})
 				if err != nil {
 					return apperr.Wrap(apperr.KindOperation, err)
 				}
@@ -81,6 +98,7 @@ func newTranscodeCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
 	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")
 	command.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure")
+	command.Flags().StringVar(&filterName, "filter", "", "named rules filter for directory input")
 	var asJSON bool
 	formats := &cobra.Command{
 		Use:   "formats",
@@ -106,6 +124,25 @@ func newTranscodeCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 	formats.Flags().BoolVarP(&asJSON, "json", "j", false, "write JSON output")
 	command.AddCommand(formats)
 	return command
+}
+
+func loadTranscodeFilter(runtime Runtime, configuredRules, name string) (*rules.Condition, error) {
+	if name == "" {
+		return nil, nil
+	}
+	path, err := rulesPath(runtime, configuredRules, nil)
+	if err != nil {
+		return nil, err
+	}
+	file, err := rules.Load(path)
+	if err != nil {
+		return nil, err
+	}
+	condition, ok := file.Filters[name]
+	if !ok {
+		return nil, fmt.Errorf("transcode filter %q does not exist", name)
+	}
+	return &condition, nil
 }
 
 func transcodeFile(input, destination string, syntax *transfer.Syntax) error {
