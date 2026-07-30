@@ -94,6 +94,7 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	command.AddCommand(newValidateCommand(runtime, &options))
 	command.AddCommand(newAnonymizeCommand(runtime, &options))
 	command.AddCommand(newEditCommand(runtime, &options))
+	command.AddCommand(newConvertCommand(runtime, &options))
 	command.AddCommand(newTranscodeCommand(runtime, &options))
 
 	return command
