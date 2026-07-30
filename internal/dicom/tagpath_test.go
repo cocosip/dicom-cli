@@ -34,6 +34,7 @@ func TestResolveElementReadsKeywordHexAndNestedSequence(t *testing.T) {
 			t.Fatalf("ResolveElement(%q) = nil", path)
 		}
 	}
+	parsed.Dataset.Remove(tag.StudyDescription)
 	if _, err := ResolveElement(parsed.Dataset, "StudyDescription"); err == nil {
 		t.Fatal("ResolveElement(missing) error = nil")
 	}
