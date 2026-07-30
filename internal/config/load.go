@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
@@ -50,11 +51,14 @@ type LocateOptions struct {
 // TargetOverrides represents explicitly supplied command-line target values.
 // A nil pointer means the command did not supply that field.
 type TargetOverrides struct {
-	Target         *string
-	Host           *string
-	Port           *int
-	CallingAETitle *string
-	CalledAETitle  *string
+	Target           *string
+	Host             *string
+	Port             *int
+	CallingAETitle   *string
+	CalledAETitle    *string
+	ConnectTimeout   *time.Duration
+	AssociateTimeout *time.Duration
+	IdleTimeout      *time.Duration
 }
 
 // Locate selects one configuration file without combining values from files.
@@ -149,6 +153,15 @@ func ResolveTarget(config Config, command TargetOverrides, lookupEnv func(string
 	}
 	if command.CalledAETitle != nil {
 		target.CalledAETitle = *command.CalledAETitle
+	}
+	if command.ConnectTimeout != nil {
+		target.Timeouts.Connect = *command.ConnectTimeout
+	}
+	if command.AssociateTimeout != nil {
+		target.Timeouts.Associate = *command.AssociateTimeout
+	}
+	if command.IdleTimeout != nil {
+		target.Timeouts.Idle = *command.IdleTimeout
 	}
 
 	if target.Port != 0 && (target.Port < 1 || target.Port > 65535) {

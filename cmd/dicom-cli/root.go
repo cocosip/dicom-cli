@@ -96,6 +96,8 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	command.AddCommand(newEditCommand(runtime, &options))
 	command.AddCommand(newConvertCommand(runtime, &options))
 	command.AddCommand(newTranscodeCommand(runtime, &options))
+	command.AddCommand(newEchoCommand(runtime, &options))
+	command.AddCommand(newSendCommand(runtime, &options))
 
 	return command
 }

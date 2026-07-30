@@ -171,6 +171,33 @@ func TestResolveTargetRejectsInvalidEnvironmentPort(t *testing.T) {
 	}
 }
 
+func TestResolveTargetAppliesCommandTimeoutOverrides(t *testing.T) {
+	config := DefaultConfig()
+	configuredTarget := "archive"
+	config.Targets[configuredTarget] = PACSTarget{
+		Host:           "archive.example.test",
+		Port:           11112,
+		CallingAETitle: "DICOMCLI",
+		CalledAETitle:  "ARCHIVE",
+	}
+	connectTimeout := 3 * time.Second
+	associateTimeout := 4 * time.Second
+	idleTimeout := 5 * time.Second
+
+	target, err := ResolveTarget(config, TargetOverrides{
+		Target:           &configuredTarget,
+		ConnectTimeout:   &connectTimeout,
+		AssociateTimeout: &associateTimeout,
+		IdleTimeout:      &idleTimeout,
+	}, envLookup(nil))
+	if err != nil {
+		t.Fatalf("ResolveTarget() error = %v", err)
+	}
+	if target.Timeouts != (Timeouts{Connect: connectTimeout, Associate: associateTimeout, Idle: idleTimeout}) {
+		t.Fatalf("ResolveTarget() timeouts = %#v", target.Timeouts)
+	}
+}
+
 func writeConfigFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

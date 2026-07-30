@@ -313,8 +313,7 @@ dicom-cli
 
 ```text
 cmd/                 CLI 参数、stdout/stderr、退出码
-internal/app/        inspect、validate、anonymize、edit、convert、transcode、send 用例
+internal/app/        inspect、validate、anonymize、edit、convert、transcode、echo、send 用例及 Association 生命周期
 internal/dicom/      go-dicom / go-dicom-codecs 适配与文件能力
-internal/dimse/      C-ECHO、C-STORE SCU、Association 生命周期
 internal/output/     各命令的报告与二进制输出处理
 ```

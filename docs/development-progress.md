@@ -90,16 +90,16 @@
 
 ## P6 DIMSE SCU：echo 与 send
 
-- [ ] **P6.1 实现 DIMSE 目标解析**：依赖 P1.1-P1.3；完成条件：命名目标、命令行覆盖、环境优先级、AE/端口校验均有表驱动测试。
-- [ ] **P6.2 实现连接与 Association 超时**：依赖 P6.1；完成条件：明文 TCP 下连接 10 秒、协商 30 秒、读写空闲 5 分钟及覆盖值均由本地测试端验证。
-- [ ] **P6.3 实现 C-ECHO**：依赖 P6.2、P2.9；完成条件：本地 DIMSE peer 集成测试验证文本/JSON 结果和错误映射。
-- [ ] **P6.4 实现 send 输入收集**：依赖 P2.7、P6.1；完成条件：单文件、目录、stdin 路径列表及筛选跳过原因均有测试。
-- [ ] **P6.5 实现顺序 C-STORE 与 Association 复用**：依赖 P6.2、P6.4；完成条件：本地 peer 断言默认复用 Association，max-instances 正确滚动连接。
-- [ ] **P6.6 实现并行 Association 调度**：依赖 P6.5；完成条件：`--concurrency > 1` 的并行数和 Association 数量受控。
-- [ ] **P6.7 实现发送失败分类与重试**：依赖 P6.5；完成条件：只重试网络/超时/Association 中断，PACS C-STORE 状态失败绝不重试。
-- [ ] **P6.8 实现 send 进度与报告**：依赖 P2.9、P6.4；完成条件：进度写 stderr，汇总/详细报告可用，失败路径清单可被 stdin 再次消费。
-- [ ] **P6.9 禁止隐式转码**：依赖 P5.1、P6.5；完成条件：目标不接受源传输语法时仅报告发送失败，不调用 transcode。
-- [ ] **P6.10 验收 P6 本地 DIMSE 测试端**：依赖 P6.1-P6.9；完成条件：`go test ./internal/dimse ./internal/app ./cmd/dicom-cli ./tests/integration -run 'Echo|Send'` 成功。
+- [x] **P6.1 实现 DIMSE 目标解析**：依赖 P1.1-P1.3；完成条件：命名目标、命令行覆盖、环境优先级、AE/端口校验均有表驱动测试。
+- [x] **P6.2 实现连接与 Association 超时**：依赖 P6.1；完成条件：明文 TCP 下连接 10 秒、协商 30 秒、读写空闲 5 分钟及覆盖值均由本地测试端验证。
+- [x] **P6.3 实现 C-ECHO**：依赖 P6.2、P2.9；完成条件：本地 DIMSE peer 集成测试验证文本/JSON 结果和错误映射。
+- [x] **P6.4 实现 send 输入收集**：依赖 P2.7、P6.1；完成条件：单文件、目录、stdin 路径列表及筛选跳过原因均有测试。
+- [x] **P6.5 实现顺序 C-STORE 与 Association 复用**：依赖 P6.2、P6.4；完成条件：本地 peer 断言默认复用 Association，max-instances 正确滚动连接。
+- [x] **P6.6 实现并行 Association 调度**：依赖 P6.5；完成条件：`--concurrency > 1` 的并行数和 Association 数量受控。
+- [x] **P6.7 实现发送失败分类与重试**：依赖 P6.5；完成条件：只重试网络/超时/Association 中断，PACS C-STORE 状态失败绝不重试。
+- [x] **P6.8 实现 send 进度与报告**：依赖 P2.9、P6.4；完成条件：进度写 stderr，汇总/详细报告可用，失败路径清单可被 stdin 再次消费。
+- [x] **P6.9 禁止隐式转码**：依赖 P5.1、P6.5；完成条件：目标不接受源传输语法时仅报告发送失败，不调用 transcode。
+- [x] **P6.10 验收 P6 本地 DIMSE 测试端**：依赖 P6.1-P6.9；完成条件：`go test ./internal/app ./cmd/dicom-cli ./tests/integration -run 'Echo|Send'` 成功。
 - [ ] **P6.11 真实 PACS 互操作验收**：依赖 P6.10；阻塞原因：等待地址、端口、Calling/Called AE 和测试数据，全部通过环境变量传入。
 
 ## P7 发布与最终验收
