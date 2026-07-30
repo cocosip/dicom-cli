@@ -24,7 +24,13 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "transcode <file>",
 		Short: "Re-encode DICOM transfer syntaxes",
-		Args:  cobra.ExactArgs(1),
+		Long: "Re-encode DICOM transfer syntaxes.\n\n" +
+			"--to accepts a transfer syntax alias or standard UID. Run " +
+			"`dicom-cli transcode formats` to list values available in this binary.",
+		Example: "  dicom-cli transcode formats\n" +
+			"  dicom-cli transcode --to rle --output compressed.dcm image.dcm\n" +
+			"  dicom-cli transcode --to 1.2.840.10008.1.2.1 --output output.dcm image.dcm",
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if target == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--to is required"))
@@ -96,7 +102,7 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return nil
 		},
 	}
-	command.Flags().StringVar(&target, "to", "", "target transfer syntax alias or UID")
+	command.Flags().StringVar(&target, "to", "", "target transfer syntax alias or UID; run 'transcode formats' to list values")
 	command.Flags().StringVarP(&destination, "output", "o", "", "output DICOM file")
 	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
 	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")

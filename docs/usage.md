@@ -115,7 +115,7 @@ dicom-cli anonymize --profile basic --recursive --filter ct-images --output anon
 只输出汇总。单文件可以用 `--output -` 将二进制 DICOM 写到 stdout，多个二进制结果
 不能写到 stdout。
 
-## convert 与 transcode
+## convert、encapsulate 与 transcode
 
 ### convert
 
@@ -123,21 +123,27 @@ dicom-cli anonymize --profile basic --recursive --filter ct-images --output anon
 dicom-cli convert image --format png --output image.png image.dcm
 dicom-cli convert image --all-frames --output frames image.dcm
 dicom-cli convert json --output metadata.json image.dcm
-dicom-cli convert dicom --patient-name ANON^PATIENT --output image.dcm source.png
 ```
 
 `convert image <input>` 导出 PNG 或 JPEG。`--frame` 是从 1 开始的帧号；默认导出
 首帧，`--all-frames` 导出每一帧。`convert json <input>` 默认将 PixelData 写为摘要，
-只有 `--include-pixel-data` 才包含像素字节。`convert dicom <input>` 将 8 位灰度、
-8 位 RGB PNG/JPEG 或 16 位灰度 PNG 封装成 Secondary Capture DICOM；必须由
-`--patient-name`、`--template` 或 `--reference` 提供 PatientName。
+只有 `--include-pixel-data` 才包含像素字节。
 
-三个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
-`--output`。目录默认不递归。图片和 DICOM 的二进制 stdout 都要求恰好一个结果；
-多帧、多文件和目录输入不得使用 `--output -`。
+两个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
+`--output`。目录默认不递归。图片二进制 stdout 要求恰好一个结果；多帧、多文件和
+目录输入不得使用 `--output -`。
 
-顶层 `convert <input> --to png|jpeg|json|dicom` 与对应子命令走同一行为；
-`--to dicom` 使用 `--patient-name`、`--template` 和 `--reference`。
+### encapsulate
+
+```sh
+dicom-cli encapsulate image --patient-name ANON^PATIENT --output image.dcm source.png
+```
+
+`encapsulate image <input>` 将 8 位灰度、8 位 RGB PNG/JPEG 或 16 位灰度 PNG
+封装为 Secondary Capture DICOM。必须由 `--patient-name`、`--template` 或
+`--reference` 提供 PatientName。输出固定为未压缩的 Explicit VR Little Endian；
+不提供传输语法或压缩选项。目录模式支持 `--recursive`、`--flatten`、`--fail-fast` 和
+`--output`，并在一次调用内共享新 Study/Series UID、为每张图片生成独立 SOP Instance UID。
 
 ### transcode
 
@@ -148,9 +154,10 @@ dicom-cli transcode --to 1.2.840.10008.1.2.1 --output output study
 ```
 
 `transcode formats` 显示当前二进制实际注册的传输语法、别名和编码/解码能力，
-可加 `--json`。`transcode <file> --to <alias-or-uid>` 接受单文件或目录；目录模式
-支持 `--recursive`、`--flatten`、`--filter`、`--fail-fast`。`--to` 可使用别名或
-标准传输语法 UID。转码只改变与编解码和传输语法有关的数据；输出路径不得是输入路径。
+可加 `--json`。`--to` 仅用于 `transcode`，接受 `transcode formats` 输出的别名或标准
+传输语法 UID，例如 `--to rle` 或 `--to 1.2.840.10008.1.2.1`。`transcode <file>`
+接受单文件或目录；目录模式支持 `--recursive`、`--flatten`、`--filter`、`--fail-fast`。
+转码只改变与编解码和传输语法有关的数据；输出路径不得是输入路径。
 
 HTJ2K 显示为 experimental。能列出或完成合成样本转码不等于已验证真实样本互操作。
 

@@ -35,8 +35,7 @@
 | `edit <file>` | 单个 DICOM 文件 | 修改后的新 DICOM 文件 |
 | `convert image <path>` | 单文件或目录 DICOM | PNG/JPEG |
 | `convert json <path>` | 单文件或目录 DICOM | JSON 元数据 |
-| `convert dicom <path>` | 单文件或目录 PNG/JPEG | Secondary Capture DICOM |
-| `convert <input> --to <format>` | 与对应转换入口相同 | 与子命令相同 |
+| `encapsulate image <path>` | 单文件或目录 PNG/JPEG | 未压缩 Secondary Capture DICOM |
 | `transcode <path> --to <syntax>` | 单文件或目录 DICOM | 新传输语法的 DICOM |
 | `transcode formats` | 无 | 当前二进制实际注册的语法清单 |
 | `echo` | 目标配置或命令行连接参数 | C-ECHO 结果 |
@@ -107,7 +106,7 @@ UID 映射仅作用于一次命令调用的全部输入：相同原 UID 始终�
 
 `convert json` 使用 `go-dicom` 的 JSON 序列化；默认仅输出 PixelData 摘要，`--include-pixel-data` 才 Base64 输出像素内容。
 
-`convert dicom` 支持 8 位灰度、8 位 RGB PNG/JPEG 和 16 位灰度 PNG。元数据来自规则模板或参考 DICOM，命令行可覆盖；默认封装为 Secondary Capture，使用 Explicit VR Little Endian。目录输入未显式提供 Study/Series UID 时，应在一次调用内共享一个新 Study UID 和一个新 Series UID，每图生成独立 SOP Instance UID。
+`encapsulate image` 支持 8 位灰度、8 位 RGB PNG/JPEG 和 16 位灰度 PNG。元数据来自规则模板或参考 DICOM，命令行可覆盖；默认封装为 Secondary Capture，固定使用 Explicit VR Little Endian，不提供压缩或传输语法参数。目录输入未显式提供 Study/Series UID 时，应在一次调用内共享一个新 Study UID 和一个新 Series UID，每图生成独立 SOP Instance UID。
 
 `transcode` 将 DICOM 转换为指定传输语法并更新文件元信息。仅允许修改与编解码及传输语法相关的数据，其他数据集内容必须保持不变。`--to` 接受别名或 UID，且目标能力必须来自当前注册的 `go-dicom-codecs`。`transcode formats` 列出当前二进制实际可用的编码与解码能力，并把 HTJ2K 标为实验性。
 

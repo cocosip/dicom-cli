@@ -33,30 +33,11 @@ type dicomExportOptions struct {
 
 func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	options := dicomExportOptions{format: "png"}
-	var patientName, templateName, referencePath string
-	var recursive, failFast, flatten bool
 	command := &cobra.Command{
-		Use:   "convert <input>",
-		Short: "Convert DICOM images and metadata",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			if strings.EqualFold(options.format, "dicom") {
-				return runImageToDICOMWithMetadata(runtime, root, args[0], patientName, templateName, referencePath, options.destination, options.recursive, options.failFast, options.flatten)
-			}
-			return runDICOMExport(runtime, args[0], options)
-		},
+		Use:   "convert",
+		Short: "Export DICOM images and metadata",
+		Args:  noArgs,
 	}
-	command.Flags().StringVar(&options.format, "to", "", "output format: png, jpeg, json, or dicom")
-	command.Flags().StringVarP(&options.destination, "output", "o", "", "output file, directory, or -")
-	command.Flags().IntVar(&options.frame, "frame", 0, "one-based frame number")
-	command.Flags().BoolVar(&options.allFrames, "all-frames", false, "export every image frame")
-	command.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, "include PixelData bytes in JSON")
-	command.Flags().StringVar(&patientName, "patient-name", "", "required PatientName for DICOM output")
-	command.Flags().StringVar(&templateName, "template", "", "named DICOM template from rules")
-	command.Flags().StringVar(&referencePath, "reference", "", "reference DICOM metadata source")
-	command.Flags().BoolVarP(&options.recursive, "recursive", "r", false, "scan subdirectories")
-	command.Flags().BoolVar(&options.failFast, "fail-fast", false, "stop after the first failure")
-	command.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
 
 	imageCommand := &cobra.Command{
 		Use:   "image <input>",
@@ -89,24 +70,7 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	jsonCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, "stop after the first file failure")
 	jsonCommand.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
 
-	var destination string
-	dicomCommand := &cobra.Command{
-		Use:   "dicom <input>",
-		Short: "Encapsulate PNG or JPEG images as Secondary Capture DICOM",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runImageToDICOMWithMetadata(runtime, root, args[0], patientName, templateName, referencePath, destination, recursive, failFast, flatten)
-		},
-	}
-	dicomCommand.Flags().StringVar(&patientName, "patient-name", "", "required PatientName for created DICOM files")
-	dicomCommand.Flags().StringVar(&templateName, "template", "", "named DICOM template from rules")
-	dicomCommand.Flags().StringVar(&referencePath, "reference", "", "reference DICOM metadata source")
-	dicomCommand.Flags().StringVarP(&destination, "output", "o", "", "DICOM output file or directory")
-	dicomCommand.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
-	dicomCommand.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")
-	dicomCommand.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure")
-
-	command.AddCommand(imageCommand, jsonCommand, dicomCommand)
+	command.AddCommand(imageCommand, jsonCommand)
 	return command
 }
 
@@ -200,7 +164,7 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 		}
 	}
 	if failed > 0 {
-		return apperr.Wrap(apperr.KindOperation, fmt.Errorf("convert dicom failed for %d file(s)", failed))
+		return apperr.Wrap(apperr.KindOperation, fmt.Errorf("encapsulate image failed for %d file(s)", failed))
 	}
 	return nil
 }

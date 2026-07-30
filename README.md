@@ -74,7 +74,8 @@ dicom-cli echo --config dicom-cli.yaml --target local-pacs
 | `validate <file>` | 执行基础、标准和规则文件中的校验。 |
 | `edit <file>` | 写出修改后的单个 DICOM 文件。 |
 | `anonymize <file-or-directory>` | 按内置或命名 profile 写出脱敏文件。 |
-| `convert image|json|dicom` | 导出图像/JSON，或将 PNG/JPEG 封装为 Secondary Capture DICOM。 |
+| `convert image|json` | 从 DICOM 导出图像或 JSON。 |
+| `encapsulate image <file-or-directory>` | 将 PNG/JPEG 封装为未压缩的 Secondary Capture DICOM。 |
 | `transcode <file>` | 使用当前二进制实际注册的 codec 重编码 DICOM。 |
 | `transcode formats` | 显示可用传输语法、别名和编解码能力。 |
 | `echo` | 对目标执行 DICOM C-ECHO。 |

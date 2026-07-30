@@ -204,7 +204,8 @@ dicom_templates:
 
 图片封装 DICOM 支持 8 位灰度、8 位 RGB 的 PNG/JPEG，以及 16 位灰度 PNG；TIFF、BMP 等输入格式不在第一版范围内。
 
-图片封装 DICOM 默认使用 Explicit VR Little Endian；`--transfer-syntax` 可指定 `go-dicom-codecs` 支持的别名或 UID。
+`encapsulate image` 固定使用未压缩的 Explicit VR Little Endian。需要压缩时，先封装，
+再用 `transcode --to <alias-or-uid>` 重编码。
 
 转码需要按目标传输语法重新编码像素数据，并更新文件元信息中的传输语法；除必要的编码相关元数据外，原数据集应保持不变。压缩传输语法以 `go-dicom-codecs` 实际提供的编码器和解码器为准；第一期同时覆盖 DICOM 的原始未压缩编码。实现前需通过 PoC 生成实际支持语法清单。
 
@@ -243,7 +244,8 @@ CLI 编译时导入相应 codec 注册包，`transcode formats` 只列出当前�
 
 源 DICOM 为高位灰度而目标为 JPEG 时，按源像素样本范围线性缩放为 8 位；导出 PNG 则保留可用的原始位深。
 
-`convert` 同时支持子命令与 `--to` 两种入口，例如 `convert image input.dcm --format png` 和 `convert input.dcm --to png`；两种写法进入同一转换实现。
+`convert` 只接受 DICOM 输入，并按子命令导出图片或 JSON；图片格式由
+`convert image --format png|jpeg` 选择。传输语法目标只使用 `transcode --to` 指定。
 
 ## 校验范围
 
@@ -294,8 +296,7 @@ dicom-cli
   edit <file>                            # 单文件 Tag 修改
   convert image <file-or-directory>      # DICOM 导出 PNG/JPEG
   convert json <file-or-directory>       # DICOM 元数据导出 JSON
-  convert dicom <file-or-directory>      # 图片封装 DICOM
-  convert <input> --to <format>          # 与以上转换入口等价
+  encapsulate image <file-or-directory>  # PNG/JPEG 封装 Secondary Capture DICOM
   transcode <file-or-directory> --to ... # 传输语法转换
   transcode formats                       # 列出可用传输语法
   echo                                   # C-ECHO SCU

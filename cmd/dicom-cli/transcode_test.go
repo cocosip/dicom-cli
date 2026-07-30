@@ -24,6 +24,18 @@ func TestExecuteTranscodeFormatsListsRuntimeCodecsAndExperimentalHTJ2K(t *testin
 	}
 }
 
+func TestExecuteTranscodeHelpExplainsTargetTransferSyntax(t *testing.T) {
+	runtime, stdout, _ := testRuntime()
+	if code := Execute([]string{"transcode", "--help"}, runtime); code != 0 {
+		t.Fatalf("transcode --help exit code = %d, want 0", code)
+	}
+	for _, want := range []string{"--to", "alias or UID", "transcode formats"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("transcode help does not contain %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestExecuteTranscodeDirectoryWritesAllDICOMFiles(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {

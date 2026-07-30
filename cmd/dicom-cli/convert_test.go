@@ -20,7 +20,7 @@ import (
 	"github.com/cocosip/go-dicom/pkg/dicom/writer"
 )
 
-func TestExecuteConvertImageAndJSONUseSharedDICOMExport(t *testing.T) {
+func TestExecuteConvertImageAndJSONExportDICOM(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -37,8 +37,8 @@ func TestExecuteConvertImageAndJSONUseSharedDICOMExport(t *testing.T) {
 
 	jsonPath := filepath.Join(t.TempDir(), "metadata.json")
 	runtime, _, _ = testRuntime()
-	if code := Execute([]string{"convert", "--to", "json", "--output", jsonPath, fixtures.SingleFrame}, runtime); code != 0 {
-		t.Fatalf("convert --to json exit code = %d, want 0", code)
+	if code := Execute([]string{"convert", "json", "--output", jsonPath, fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("convert json exit code = %d, want 0", code)
 	}
 	jsonContent, err := os.ReadFile(jsonPath)
 	if err != nil || !strings.Contains(string(jsonContent), `"summary"`) {
@@ -46,7 +46,7 @@ func TestExecuteConvertImageAndJSONUseSharedDICOMExport(t *testing.T) {
 	}
 }
 
-func TestExecuteConvertDICOMGroupsDirectoryUIDs(t *testing.T) {
+func TestExecuteEncapsulateImageGroupsDirectoryUIDs(t *testing.T) {
 	input := t.TempDir()
 	for _, name := range []string{"one.png", "two.png"} {
 		file, err := os.Create(filepath.Join(input, name))
@@ -69,8 +69,8 @@ func TestExecuteConvertDICOMGroupsDirectoryUIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "dicom", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
-		t.Fatalf("convert dicom exit code = %d, want 0", code)
+	if code := Execute([]string{"encapsulate", "image", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("encapsulate image exit code = %d, want 0", code)
 	}
 	first, err := parser.ParseFile(filepath.Join(output, "one.dcm"))
 	if err != nil {
@@ -101,7 +101,7 @@ func TestExecuteConvertDICOMGroupsDirectoryUIDs(t *testing.T) {
 	}
 }
 
-func TestExecuteConvertToDICOMUsesImageEncapsulationPath(t *testing.T) {
+func TestExecuteEncapsulateImageUsesDefaultTransferSyntax(t *testing.T) {
 	input := filepath.Join(t.TempDir(), "input.png")
 	file, err := os.Create(input)
 	if err != nil {
@@ -115,11 +115,15 @@ func TestExecuteConvertToDICOMUsesImageEncapsulationPath(t *testing.T) {
 	}
 	output := filepath.Join(t.TempDir(), "output.dcm")
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "--to", "dicom", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
-		t.Fatalf("convert --to dicom exit code = %d, want 0", code)
+	if code := Execute([]string{"encapsulate", "image", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("encapsulate image exit code = %d, want 0", code)
 	}
-	if _, err := parser.ParseFile(output); err != nil {
+	parsed, err := parser.ParseFile(output)
+	if err != nil {
 		t.Fatalf("parse output: %v", err)
+	}
+	if parsed.TransferSyntax != transfer.ExplicitVRLittleEndian {
+		t.Fatalf("transfer syntax = %s, want Explicit VR Little Endian", parsed.TransferSyntax.UID())
 	}
 }
 
@@ -156,8 +160,8 @@ func TestExecuteConvertDICOMMergesTemplateReferenceAndCLI(t *testing.T) {
 	}
 	output := filepath.Join(t.TempDir(), "output.dcm")
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "dicom", "--rules", rulesPath, "--template", "source", "--reference", reference, "--patient-name", "CLI^PATIENT", "--output", output, input}, runtime); code != 0 {
-		t.Fatalf("convert dicom exit code = %d, want 0", code)
+	if code := Execute([]string{"encapsulate", "image", "--rules", rulesPath, "--template", "source", "--reference", reference, "--patient-name", "CLI^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("encapsulate image exit code = %d, want 0", code)
 	}
 	parsed, err := parser.ParseFile(output)
 	if err != nil {
@@ -251,7 +255,7 @@ func TestExecuteConvertImageExportsDICOMDirectory(t *testing.T) {
 	}
 }
 
-func TestExecuteConvertDICOMDisambiguatesSameStemImageNames(t *testing.T) {
+func TestExecuteEncapsulateImageDisambiguatesSameStemImageNames(t *testing.T) {
 	input := t.TempDir()
 	imageValue := image.NewGray(image.Rect(0, 0, 1, 1))
 	pngFile, err := os.Create(filepath.Join(input, "image.png"))
@@ -276,12 +280,29 @@ func TestExecuteConvertDICOMDisambiguatesSameStemImageNames(t *testing.T) {
 	}
 	output := filepath.Join(t.TempDir(), "output")
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "dicom", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
-		t.Fatalf("convert dicom exit code = %d, want 0", code)
+	if code := Execute([]string{"encapsulate", "image", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("encapsulate image exit code = %d, want 0", code)
 	}
 	for _, name := range []string{"image.dcm", "image-1.dcm"} {
 		if _, err := parser.ParseFile(filepath.Join(output, name)); err != nil {
 			t.Fatalf("parse %s: %v", name, err)
+		}
+	}
+}
+
+func TestExecuteConvertHelpListsOnlyDICOMExportSubcommands(t *testing.T) {
+	runtime, stdout, _ := testRuntime()
+	if code := Execute([]string{"convert", "--help"}, runtime); code != 0 {
+		t.Fatalf("convert --help exit code = %d, want 0", code)
+	}
+	for _, want := range []string{"image", "json"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("convert help does not contain %q:\n%s", want, stdout.String())
+		}
+	}
+	for _, unwanted := range []string{"\n  dicom ", "--to"} {
+		if strings.Contains(stdout.String(), unwanted) {
+			t.Fatalf("convert help contains removed %q:\n%s", unwanted, stdout.String())
 		}
 	}
 }

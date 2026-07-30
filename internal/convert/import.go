@@ -28,7 +28,7 @@ type ImportedImage struct {
 }
 
 // LoadImage accepts only the raster formats and pixel layouts supported by
-// convert dicom: 8-bit grayscale/RGB PNG or JPEG and 16-bit grayscale PNG.
+// encapsulate image: 8-bit grayscale/RGB PNG or JPEG and 16-bit grayscale PNG.
 func LoadImage(path string) (result ImportedImage, err error) {
 	extension := strings.ToLower(filepath.Ext(path))
 	if extension != ".png" && extension != ".jpg" && extension != ".jpeg" {
