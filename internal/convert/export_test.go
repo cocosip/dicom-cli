@@ -105,8 +105,8 @@ func TestExportFrameAppliesCTRescaleAndWindowForJPEG(t *testing.T) {
 		element.NewUnsignedShort(tag.PixelRepresentation, []uint16{1}),
 		element.NewString(tag.RescaleSlope, vr.DS, []string{"1"}),
 		element.NewString(tag.RescaleIntercept, vr.DS, []string{"-1024"}),
-		element.NewString(tag.WindowCenter, vr.DS, []string{"0"}),
-		element.NewString(tag.WindowWidth, vr.DS, []string{"500"}),
+		element.NewString(tag.WindowCenter, vr.DS, []string{"0", "400"}),
+		element.NewString(tag.WindowWidth, vr.DS, []string{"500", "1000"}),
 		element.NewOtherWord(tag.PixelData, []byte{0x00, 0x04, 0xfa, 0x04}),
 	} {
 		if err := parsed.Dataset.AddOrUpdate(item); err != nil {

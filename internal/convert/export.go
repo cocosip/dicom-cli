@@ -154,7 +154,8 @@ func dicomDecimal(ds *dataset.Dataset, field *tag.Tag, fallback float64) (float6
 	if !ok || strings.TrimSpace(value) == "" {
 		return fallback, nil
 	}
-	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	value = strings.TrimSpace(strings.SplitN(value, "\\", 2)[0])
+	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
 		return 0, fmt.Errorf("invalid %s value %q", field, value)
 	}
