@@ -73,19 +73,19 @@
 
 ## P5 转换与传输语法转码
 
-- [ ] **P5.1 建立 codec 注册表**：依赖 P0.1、P2.2；完成条件：实际编译进二进制的 codec 包可枚举，传输语法别名/UID 查询不使用静态伪清单。
-- [ ] **P5.2 实现 transcode formats**：依赖 P5.1；完成条件：列出编码/解码能力，HTJ2K 显示 experimental 标记。
-- [ ] **P5.3 实现 DICOM 到 PNG/JPEG 帧导出**：依赖 P2.2、P2.9、P5.1；完成条件：默认首帧、`--frame`、`--all-frames` 与文件命名测试通过。
-- [ ] **P5.4 实现图片导出像素策略**：依赖 P5.3；完成条件：不应用显示 LUT/窗宽窗位，高位灰度 JPEG 缩放与 PNG 位深保留测试通过。
-- [ ] **P5.5 实现 DICOM 元数据 JSON**：依赖 P2.2、P2.9；完成条件：默认 PixelData 摘要，显式选项才 Base64 输出像素内容。
-- [ ] **P5.6 统一图片/JSON 转换入口**：依赖 P5.3-P5.5；完成条件：`convert image`、`convert json`、`convert --to png|jpeg|json` 进入同一用例并通过集成测试。
-- [ ] **P5.7 实现图片输入限制**：依赖 P2.2；完成条件：支持 8 位灰度、8 位 RGB PNG/JPEG 和 16 位灰度 PNG，TIFF/BMP/不支持位深失败。
-- [ ] **P5.8 实现图片到 DICOM 模板合并**：依赖 P1.6、P5.7；完成条件：规则模板、参考 DICOM、命令行覆盖优先级正确，缺少不可推断必填字段失败。
-- [ ] **P5.9 实现 Secondary Capture UID 分组**：依赖 P2.5、P5.8；完成条件：图片目录在一次调用内共享新 Study/Series UID，每图有独立 SOP UID。
-- [ ] **P5.10 完成图片到 DICOM 命令**：依赖 P2.8-P2.10、P5.7-P5.9；完成条件：`convert dicom` 与 `convert --to dicom` 均支持文件/目录且源图片不变。
-- [ ] **P5.11 实现 transcode 文件重编码**：依赖 P5.1、P2.2；完成条件：更新 FMI 传输语法，除编解码相关数据外保留数据集内容，原始/压缩语法往返测试通过。
-- [ ] **P5.12 完成 transcode 批处理命令**：依赖 P2.7-P2.10、P5.11；完成条件：别名/UID、筛选、递归、fail-fast 和安全输出均通过集成测试。
-- [ ] **P5.13 验收 P5 合成样本**：依赖 P5.1-P5.12；完成条件：`go test ./internal/dicom ./internal/convert ./internal/app ./cmd/dicom-cli -run 'Convert|Transcode'` 成功。
+- [x] **P5.1 建立 codec 注册表**：依赖 P0.1、P2.2；完成条件：实际编译进二进制的 codec 包可枚举，传输语法别名/UID 查询不使用静态伪清单。
+- [x] **P5.2 实现 transcode formats**：依赖 P5.1；完成条件：列出编码/解码能力，HTJ2K 显示 experimental 标记。
+- [x] **P5.3 实现 DICOM 到 PNG/JPEG 帧导出**：依赖 P2.2、P2.9、P5.1；完成条件：默认首帧、`--frame`、`--all-frames` 与文件命名测试通过。
+- [x] **P5.4 实现图片导出像素策略**：依赖 P5.3；完成条件：不应用显示 LUT/窗宽窗位，高位灰度 JPEG 缩放与 PNG 位深保留测试通过。
+- [x] **P5.5 实现 DICOM 元数据 JSON**：依赖 P2.2、P2.9；完成条件：默认 PixelData 摘要，显式选项才 Base64 输出像素内容。
+- [x] **P5.6 统一图片/JSON 转换入口**：依赖 P5.3-P5.5；完成条件：`convert image`、`convert json`、`convert --to png|jpeg|json` 进入同一用例并通过集成测试。
+- [x] **P5.7 实现图片输入限制**：依赖 P2.2；完成条件：支持 8 位灰度、8 位 RGB PNG/JPEG 和 16 位灰度 PNG，TIFF/BMP/不支持位深失败。
+- [x] **P5.8 实现图片到 DICOM 模板合并**：依赖 P1.6、P5.7；完成条件：规则模板、参考 DICOM、命令行覆盖优先级正确，缺少不可推断必填字段失败。
+- [x] **P5.9 实现 Secondary Capture UID 分组**：依赖 P2.5、P5.8；完成条件：图片目录在一次调用内共享新 Study/Series UID，每图有独立 SOP UID。
+- [x] **P5.10 完成图片到 DICOM 命令**：依赖 P2.8-P2.10、P5.7-P5.9；完成条件：`convert dicom` 与 `convert --to dicom` 均支持文件/目录且源图片不变。
+- [x] **P5.11 实现 transcode 文件重编码**：依赖 P5.1、P2.2；完成条件：更新 FMI 传输语法，除编解码相关数据外保留数据集内容，原始/压缩语法往返测试通过。
+- [x] **P5.12 完成 transcode 批处理命令**：依赖 P2.7-P2.10、P5.11；完成条件：别名/UID、筛选、递归、fail-fast 和安全输出均通过集成测试。
+- [x] **P5.13 验收 P5 合成样本**：依赖 P5.1-P5.12；完成条件：`go test ./internal/dicom ./internal/convert ./internal/app ./cmd/dicom-cli -run 'Convert|Transcode'` 成功。
 - [ ] **P5.14 codec 与真实 DICOM 兼容性回归**：依赖 P5.13；阻塞原因：等待外部样本，HTJ2K 需要单列实验性结果。
 
 ## P6 DIMSE SCU：echo 与 send

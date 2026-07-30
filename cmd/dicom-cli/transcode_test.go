@@ -124,4 +124,37 @@ func TestExecuteTranscodeWritesRequestedSyntax(t *testing.T) {
 	if parsed.TransferSyntax != transfer.ImplicitVRLittleEndian {
 		t.Fatalf("transfer syntax = %s, want Implicit VR Little Endian", parsed.TransferSyntax.UID())
 	}
+	if parsed.FileMetaInformation == nil {
+		t.Fatal("file meta information is missing")
+	}
+	if got, _ := parsed.FileMetaInformation.Dataset().GetString(tag.TransferSyntaxUID); got != transfer.ImplicitVRLittleEndian.UID().UID() {
+		t.Fatalf("file meta TransferSyntaxUID = %q", got)
+	}
+}
+
+func TestExecuteTranscodeDirectoryRecursivelyPreservesRelativePaths(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := t.TempDir()
+	nested := filepath.Join(input, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(fixtures.SingleFrame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "one.dcm"), content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"transcode", "--recursive", "--to", "implicit-vr-little-endian", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("recursive transcode exit code = %d, want 0", code)
+	}
+	if _, err := parser.ParseFile(filepath.Join(output, "nested", "one.dcm")); err != nil {
+		t.Fatalf("parse recursive output: %v", err)
+	}
 }

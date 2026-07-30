@@ -63,6 +63,11 @@ func TestExecuteConvertDICOMGroupsDirectoryUIDs(t *testing.T) {
 		}
 	}
 	output := filepath.Join(t.TempDir(), "output")
+	sourcePath := filepath.Join(input, "one.png")
+	sourceBefore, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	runtime, _, _ := testRuntime()
 	if code := Execute([]string{"convert", "dicom", "--patient-name", "SYNTHETIC^PATIENT", "--output", output, input}, runtime); code != 0 {
 		t.Fatalf("convert dicom exit code = %d, want 0", code)
@@ -86,6 +91,13 @@ func TestExecuteConvertDICOMGroupsDirectoryUIDs(t *testing.T) {
 	}
 	if first.TransferSyntax != transfer.ExplicitVRLittleEndian {
 		t.Fatalf("transfer syntax = %s, want Explicit VR Little Endian", first.TransferSyntax.UID())
+	}
+	sourceAfter, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(sourceBefore, sourceAfter) {
+		t.Fatal("source image changed during conversion")
 	}
 }
 
