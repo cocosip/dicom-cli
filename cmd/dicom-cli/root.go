@@ -92,6 +92,7 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	command.AddCommand(newRulesCommand(runtime, &options))
 	command.AddCommand(newInspectCommand(runtime, &options))
 	command.AddCommand(newValidateCommand(runtime, &options))
+	command.AddCommand(newAnonymizeCommand(runtime, &options))
 	command.AddCommand(newEditCommand(runtime, &options))
 
 	return command

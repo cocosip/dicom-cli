@@ -51,6 +51,18 @@ func TestValidateAggregatesStaticRuleErrors(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsAnonymizeProfileOptions(t *testing.T) {
+	file := File{
+		Version: VersionV1,
+		Anonymize: AnonymizeSection{Profiles: map[string]AnonymizeProfile{
+			"research": {Options: []string{"retain-uids", "retain-longitudinal-temporal-information-with-full-dates"}},
+		}},
+	}
+	if err := file.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
 func TestLoadRejectsUnknownFieldsInYAMLAndJSON(t *testing.T) {
 	root := t.TempDir()
 	for _, test := range []struct{ name, content string }{

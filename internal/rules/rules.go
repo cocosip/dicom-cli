@@ -36,8 +36,9 @@ type AnonymizeSection struct {
 	Profiles map[string]AnonymizeProfile `json:"profiles,omitempty" yaml:"profiles,omitempty"`
 }
 type AnonymizeProfile struct {
-	Filter string          `json:"filter,omitempty" yaml:"filter,omitempty"`
-	Rules  []AnonymizeRule `json:"rules" yaml:"rules"`
+	Filter  string          `json:"filter,omitempty" yaml:"filter,omitempty"`
+	Options []string        `json:"options,omitempty" yaml:"options,omitempty"`
+	Rules   []AnonymizeRule `json:"rules" yaml:"rules"`
 }
 type AnonymizeRule struct {
 	Path   string  `json:"path" yaml:"path"`

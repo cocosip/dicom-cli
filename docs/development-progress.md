@@ -63,12 +63,12 @@
 
 ## P4 脱敏
 
-- [ ] **P4.1 定义内置脱敏 profile**：依赖 P1.6、P2.3；完成条件：实现 DICOM Basic Application Level Confidentiality Profile 及标准可选项，并有规则单元测试。
-- [ ] **P4.2 实现 profile 叠加与四类动作**：依赖 P4.1、P1.8；完成条件：外部规则叠加、delete、clear、replace、remap_uid 均有覆盖顺序测试。
-- [ ] **P4.3 接入批次 UID 映射**：依赖 P2.6、P4.2；完成条件：一次 anonymize 调用内多文件 Study/Series/SOP 与引用 UID 映射一致。
-- [ ] **P4.4 实现脱敏报告边界**：依赖 P4.2、P2.9；完成条件：默认摘要不含敏感原值，`--report` 文件才包含前后值和 UID 映射。
-- [ ] **P4.5 完成 anonymize 批处理**：依赖 P2.7-P2.10、P4.2；完成条件：文件/目录、筛选、递归、fail-fast、私有 Tag 默认保留、输出树与源文件不变均通过集成测试。
-- [ ] **P4.6 验收 P4 合成样本**：依赖 P4.1-P4.5；完成条件：`go test ./internal/anonymize ./internal/app ./cmd/dicom-cli -run Anonymize` 成功。
+- [x] **P4.1 定义内置脱敏 profile**：依赖 P1.6、P2.3；完成条件：实现 DICOM Basic Application Level Confidentiality Profile 及标准可选项，并有规则单元测试。
+- [x] **P4.2 实现 profile 叠加与四类动作**：依赖 P4.1、P1.8；完成条件：外部规则叠加、delete、clear、replace、remap_uid 均有覆盖顺序测试。
+- [x] **P4.3 接入批次 UID 映射**：依赖 P2.6、P4.2；完成条件：一次 anonymize 调用内多文件 Study/Series/SOP 与引用 UID 映射一致。
+- [x] **P4.4 实现脱敏报告边界**：依赖 P4.2、P2.9；完成条件：默认摘要不含敏感原值，`--report` 文件才包含前后值和 UID 映射。
+- [x] **P4.5 完成 anonymize 批处理**：依赖 P2.7-P2.10、P4.2；完成条件：文件/目录、筛选、递归、fail-fast、私有 Tag 默认保留、输出树与源文件不变均通过集成测试。
+- [x] **P4.6 验收 P4 合成样本**：依赖 P4.1-P4.5；完成条件：`go test ./internal/anonymize ./internal/app ./cmd/dicom-cli -run Anonymize` 成功。
 - [ ] **P4.7 脱敏真实样本回归**：依赖 P4.6；阻塞原因：等待提供可合法用于测试的脱敏真实 DICOM 样本，路径不得写死。
 
 ## P5 转换与传输语法转码
