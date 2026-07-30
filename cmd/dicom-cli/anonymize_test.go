@@ -48,14 +48,29 @@ func TestExecuteAnonymizeWritesNewFileAndProtectsDefaultSummary(t *testing.T) {
 	}
 }
 
-func TestExecuteAnonymizeRequiresProfileAndWritesDetailedReportOnlyToFile(t *testing.T) {
+func TestExecuteAnonymizeUsesBuiltInBasicProfileByDefault(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
+	output := filepath.Join(t.TempDir(), "anonymized.dcm")
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"anonymize", fixtures.SingleFrame}, runtime); code != 2 {
-		t.Fatalf("anonymize without profile exit code = %d, want 2", code)
+	if code := Execute([]string{"anonymize", "--output", output, fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("anonymize exit code = %d, want 0", code)
+	}
+	parsed, err := parser.ParseFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if patientName, _ := parsed.Dataset.GetString(tag.PatientName); patientName == "SYNTHETIC^PATIENT" {
+		t.Fatal("default Basic profile did not anonymize PatientName")
+	}
+}
+
+func TestExecuteAnonymizeWritesDetailedReportOnlyToFile(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
 	}
 	output := filepath.Join(t.TempDir(), "anonymized.dcm")
 	report := filepath.Join(t.TempDir(), "report.json")
@@ -145,6 +160,30 @@ func TestExecuteAnonymizeLoadsExternalProfileOptionsAndFilter(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(output, "multi-frame.dcm")); !os.IsNotExist(err) {
 		t.Fatalf("nonmatching file was anonymized, err=%v", err)
+	}
+}
+
+func TestExecuteAnonymizeLoadsExplicitExternalBasicProfile(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rulesPath := filepath.Join(t.TempDir(), "rules.yaml")
+	rulesContent := "version: v1\nanonymize:\n  profiles:\n    basic:\n      rules:\n        - path: PatientName\n          action: replace\n          value: ANON^CUSTOM\n"
+	if err := os.WriteFile(rulesPath, []byte(rulesContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "anonymized.dcm")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"anonymize", "--rules", rulesPath, "--profile", "basic", "--output", output, fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("anonymize exit code = %d, want 0", code)
+	}
+	parsed, err := parser.ParseFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if patientName, _ := parsed.Dataset.GetString(tag.PatientName); patientName != "ANON^CUSTOM" {
+		t.Fatalf("PatientName = %q, want custom external basic profile", patientName)
 	}
 }
 

@@ -91,7 +91,7 @@
 
 ### 7.3 anonymize
 
-必须显式通过 `--profile/-p` 选择 profile。提供内置 DICOM Basic Application Level Confidentiality Profile 及标准可选项，外部显式规则在其上叠加。动作仅限删除、清空、固定替换和 UID 重映射；私有 Tag 默认保留。
+未指定 `--profile/-p` 时使用内置 DICOM Basic Application Level Confidentiality Profile；可通过该选项选择其他命名 profile，并通过 `--option` 选择标准可选项。规则文件路径使用 `--rules/-R` 指定，外部 profile 在内置 Basic 规则之上叠加；若外部 profile 也命名为 `basic`，必须同时显式传入 `--rules` 与 `--profile basic`。动作仅限删除、清空、固定替换和 UID 重映射；私有 Tag 默认保留。
 
 UID 映射仅作用于一次命令调用的全部输入：相同原 UID 始终映射为相同新 UID，不同原 UID 映射为不同新 UID，映射不跨调用持久化。默认报告不得包含敏感原值；只有 `--report <file>` 才可输出完整 Tag 前后值和 UID 映射。
 

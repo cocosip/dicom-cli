@@ -50,11 +50,8 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Use:   "anonymize <file-or-directory>",
 		Short: "Anonymize DICOM files into new files",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			if profile == "" {
-				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--profile is required"))
-			}
-			selected, condition, err := loadAnonymizeProfile(runtime, root.rulesPath, profile, filter)
+		RunE: func(command *cobra.Command, args []string) error {
+			selected, condition, err := loadAnonymizeProfile(runtime, root.rulesPath, profile, filter, command.Flags().Changed("profile") && root.rulesPath != "")
 			if err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
@@ -159,7 +156,7 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return nil
 		},
 	}
-	command.Flags().StringVarP(&profile, "profile", "p", "", "basic or rules anonymize profile")
+	command.Flags().StringVarP(&profile, "profile", "p", "basic", "rules anonymize profile; defaults to built-in basic")
 	command.Flags().StringArrayVar(&profileOptions, "option", nil, "standard anonymize profile option")
 	command.Flags().StringVar(&filter, "filter", "", "named rules filter")
 	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
@@ -171,9 +168,9 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	return command
 }
 
-func loadAnonymizeProfile(runtime Runtime, configuredPath, name, requestedFilter string) (rules.AnonymizeProfile, *rules.Condition, error) {
+func loadAnonymizeProfile(runtime Runtime, configuredPath, name, requestedFilter string, loadExternalBasic bool) (rules.AnonymizeProfile, *rules.Condition, error) {
 	profile := rules.AnonymizeProfile{}
-	if name == "basic" && requestedFilter == "" {
+	if name == "basic" && requestedFilter == "" && !loadExternalBasic {
 		return profile, nil, nil
 	}
 	path, err := rulesPath(runtime, configuredPath, nil)
@@ -184,7 +181,7 @@ func loadAnonymizeProfile(runtime Runtime, configuredPath, name, requestedFilter
 	if err != nil {
 		return rules.AnonymizeProfile{}, nil, err
 	}
-	if name != "basic" {
+	if name != "basic" || loadExternalBasic {
 		var ok bool
 		profile, ok = file.Anonymize.Profiles[name]
 		if !ok {

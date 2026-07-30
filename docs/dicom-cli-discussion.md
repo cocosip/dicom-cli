@@ -39,7 +39,7 @@ UID 自动生成默认使用 `2.25.<UUID 对应十进制整数>` 形式；配置
 
 运行配置支持 YAML 与 JSON，按文件扩展名识别格式，仅定义命名 PACS 目标、UID 根和运行参数。
 
-规则文件与运行配置分离，集中定义标签清单、目录筛选、脱敏规则、校验规则和图片封装模板。`inspect` 与 `validate` 可使用规则文件中的默认 profile；`anonymize` 必须显式通过 `--profile/-p` 选择命名 profile，避免误修改原始数据。
+规则文件与运行配置分离，集中定义标签清单、目录筛选、脱敏规则、校验规则和图片封装模板。`inspect` 与 `validate` 可使用规则文件中的默认 profile；`anonymize` 未指定 `--profile/-p` 时使用内置 Basic profile。外部命名 profile 通过 `--rules/-R <文件>` 和 `--profile/-p <名称>` 选择，并在内置 Basic 规则之上叠加；外部同名 `basic` profile 必须显式指定规则文件。
 
 `anonymize`、`convert`、`transcode` 和 `send` 的目录模式支持从规则文件中选择命名的 DICOM Tag 筛选条件；筛选支持 Tag 存在性、精确值、正则、数值范围及 `and` / `or` 组合。筛选只决定目录中的哪些文件进入处理，单文件命令不提供此能力。
 

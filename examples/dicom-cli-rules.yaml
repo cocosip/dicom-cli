@@ -1,4 +1,4 @@
-# Copy this file to dicom-cli-rules.yaml and select the named profiles in commands.
+# Copy this file to dicom-cli-rules.yaml. Use --rules <path> --profile <name> to apply a named profile.
 version: v1
 
 filters:
