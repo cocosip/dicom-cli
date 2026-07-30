@@ -8,6 +8,7 @@ import (
 
 	"github.com/cocosip/dicom-cli/internal/testutil"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
+	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 )
 
@@ -51,6 +52,30 @@ func TestExecuteTranscodeDirectoryWritesAllDICOMFiles(t *testing.T) {
 		if parsed.TransferSyntax != transfer.ImplicitVRLittleEndian {
 			t.Fatalf("%s transfer syntax = %s", name, parsed.TransferSyntax.UID())
 		}
+	}
+}
+
+func TestExecuteTranscodeRoundTripsRLE(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressed := filepath.Join(t.TempDir(), "compressed.dcm")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"transcode", "--to", "rle", "--output", compressed, fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("RLE transcode exit code = %d, want 0", code)
+	}
+	roundTrip := filepath.Join(t.TempDir(), "roundtrip.dcm")
+	runtime, _, _ = testRuntime()
+	if code := Execute([]string{"transcode", "--to", "explicit-vr-little-endian", "--output", roundTrip, compressed}, runtime); code != 0 {
+		t.Fatalf("RLE decode exit code = %d, want 0", code)
+	}
+	parsed, err := parser.ParseFile(roundTrip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := parsed.Dataset.GetString(tag.PatientID); got != "SYNTHETIC" {
+		t.Fatalf("PatientID = %q, want retained value", got)
 	}
 }
 

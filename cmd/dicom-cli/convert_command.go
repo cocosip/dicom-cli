@@ -11,7 +11,9 @@ import (
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	convertpkg "github.com/cocosip/dicom-cli/internal/convert"
 	"github.com/cocosip/dicom-cli/internal/files"
+	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
+	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 	"github.com/cocosip/go-dicom/pkg/dicom/uid"
 	"github.com/cocosip/go-dicom/pkg/dicom/writer"
@@ -25,9 +27,9 @@ type dicomExportOptions struct {
 	includePixelData bool
 }
 
-func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
+func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	options := dicomExportOptions{format: "png"}
-	var patientName string
+	var patientName, templateName, referencePath string
 	var recursive, failFast, flatten bool
 	command := &cobra.Command{
 		Use:   "convert <input>",
@@ -35,7 +37,7 @@ func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if strings.EqualFold(options.format, "dicom") {
-				return runImageToDICOM(runtime, args[0], patientName, options.destination, recursive, failFast, flatten)
+				return runImageToDICOMWithMetadata(runtime, root, args[0], patientName, templateName, referencePath, options.destination, recursive, failFast, flatten)
 			}
 			return runDICOMExport(runtime, args[0], options)
 		},
@@ -46,6 +48,8 @@ func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 	command.Flags().BoolVar(&options.allFrames, "all-frames", false, "export every image frame")
 	command.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, "include PixelData bytes in JSON")
 	command.Flags().StringVar(&patientName, "patient-name", "", "required PatientName for DICOM output")
+	command.Flags().StringVar(&templateName, "template", "", "named DICOM template from rules")
+	command.Flags().StringVar(&referencePath, "reference", "", "reference DICOM metadata source")
 	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories for DICOM output")
 	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first DICOM output failure")
 	command.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure for DICOM output")
@@ -81,10 +85,12 @@ func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 		Short: "Encapsulate PNG or JPEG images as Secondary Capture DICOM",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runImageToDICOM(runtime, args[0], patientName, destination, recursive, failFast, flatten)
+			return runImageToDICOMWithMetadata(runtime, root, args[0], patientName, templateName, referencePath, destination, recursive, failFast, flatten)
 		},
 	}
 	dicomCommand.Flags().StringVar(&patientName, "patient-name", "", "required PatientName for created DICOM files")
+	dicomCommand.Flags().StringVar(&templateName, "template", "", "named DICOM template from rules")
+	dicomCommand.Flags().StringVar(&referencePath, "reference", "", "reference DICOM metadata source")
 	dicomCommand.Flags().StringVarP(&destination, "output", "o", "", "DICOM output file or directory")
 	dicomCommand.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
 	dicomCommand.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")
@@ -94,9 +100,23 @@ func newConvertCommand(runtime Runtime, _ *rootOptions) *cobra.Command {
 	return command
 }
 
-func runImageToDICOM(runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool) error {
+func runImageToDICOMWithMetadata(runtime Runtime, root *rootOptions, input, patientName, templateName, referencePath, destination string, recursive, failFast, flatten bool) error {
+	template, reference, err := imageMetadataSources(runtime, root.rulesPath, templateName, referencePath)
+	if err != nil {
+		return apperr.Wrap(apperr.KindInput, err)
+	}
+	return runImageToDICOM(runtime, input, patientName, destination, recursive, failFast, flatten, template, reference)
+}
+
+func runImageToDICOM(runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool, template, reference map[string]string) error {
 	if patientName == "" {
-		return apperr.Wrap(apperr.KindInput, fmt.Errorf("--patient-name is required"))
+		patientName = reference["PatientName"]
+		if patientName == "" {
+			patientName = template["PatientName"]
+		}
+		if patientName == "" {
+			return apperr.Wrap(apperr.KindInput, fmt.Errorf("--patient-name or metadata PatientName is required"))
+		}
 	}
 	info, err := os.Stat(input)
 	if err != nil {
@@ -132,6 +152,9 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 		imageValue, err := convertpkg.LoadImage(entry.Path)
 		if err == nil {
 			dataset, buildErr := convertpkg.NewSecondaryCapture(imageValue, convertpkg.SecondaryCaptureOptions{PatientName: patientName, StudyUID: studyUID, SeriesUID: seriesUID})
+			if buildErr == nil {
+				buildErr = convertpkg.ApplyMetadata(dataset, template, reference, map[string]string{"PatientName": patientName})
+			}
 			if buildErr != nil {
 				err = buildErr
 			} else {
@@ -160,6 +183,46 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 		return apperr.Wrap(apperr.KindOperation, fmt.Errorf("convert dicom failed for %d file(s)", failed))
 	}
 	return nil
+}
+
+func imageMetadataSources(runtime Runtime, configuredRules, templateName, referencePath string) (map[string]string, map[string]string, error) {
+	template := map[string]string{}
+	if templateName != "" {
+		path, err := rulesPath(runtime, configuredRules, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		file, err := rules.Load(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		selected, ok := file.DICOMTemplates[templateName]
+		if !ok {
+			return nil, nil, fmt.Errorf("DICOM template %q does not exist", templateName)
+		}
+		template = selected.Tags
+	}
+	reference := map[string]string{}
+	if referencePath != "" {
+		parsed, err := parser.ParseFile(referencePath)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, path := range []string{"PatientName", "PatientID", "StudyInstanceUID", "SeriesInstanceUID"} {
+			if value, ok := parsed.Dataset.GetString(elementTag(path)); ok && value != "" {
+				reference[path] = value
+			}
+		}
+	}
+	return template, reference, nil
+}
+
+func elementTag(keyword string) *tag.Tag {
+	parsed, err := tag.ParseKeyword(keyword)
+	if err != nil {
+		return nil
+	}
+	return &parsed
 }
 
 func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) error {

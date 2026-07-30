@@ -107,6 +107,51 @@ func TestExecuteConvertToDICOMUsesImageEncapsulationPath(t *testing.T) {
 	}
 }
 
+func TestExecuteConvertDICOMMergesTemplateReferenceAndCLI(t *testing.T) {
+	input := filepath.Join(t.TempDir(), "input.png")
+	file, err := os.Create(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(file, image.NewGray(image.Rect(0, 0, 1, 1))); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	rulesPath := filepath.Join(t.TempDir(), "rules.yaml")
+	if err := os.WriteFile(rulesPath, []byte("version: v1\ndicom_templates:\n  source:\n    tags:\n      PatientName: TEMPLATE^PATIENT\n      PatientID: template\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reference := filepath.Join(t.TempDir(), "reference.dcm")
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(fixtures.SingleFrame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(reference, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output.dcm")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"convert", "dicom", "--rules", rulesPath, "--template", "source", "--reference", reference, "--patient-name", "CLI^PATIENT", "--output", output, input}, runtime); code != 0 {
+		t.Fatalf("convert dicom exit code = %d, want 0", code)
+	}
+	parsed, err := parser.ParseFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := parsed.Dataset.GetString(tag.PatientName); got != "CLI^PATIENT" {
+		t.Fatalf("PatientName = %q, want CLI override", got)
+	}
+	if got, _ := parsed.Dataset.GetString(tag.PatientID); got != "SYNTHETIC" {
+		t.Fatalf("PatientID = %q, want reference override", got)
+	}
+}
+
 func TestExecuteConvertImageRejectsMultipleFramesToStdout(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {
@@ -115,5 +160,22 @@ func TestExecuteConvertImageRejectsMultipleFramesToStdout(t *testing.T) {
 	runtime, _, _ := testRuntime()
 	if code := Execute([]string{"convert", "image", "--all-frames", "--output", "-", fixtures.MultiFrame}, runtime); code != 2 {
 		t.Fatalf("convert image --all-frames stdout exit code = %d, want 2", code)
+	}
+}
+
+func TestExecuteConvertImageAllFramesUsesDeterministicNames(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "frames")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"convert", "image", "--all-frames", "--output", output, fixtures.MultiFrame}, runtime); code != 0 {
+		t.Fatalf("convert image exit code = %d, want 0", code)
+	}
+	for _, name := range []string{"multi-frame-frame-0001.png", "multi-frame-frame-0002.png"} {
+		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
+			t.Fatalf("frame output %s: %v", name, err)
+		}
 	}
 }
