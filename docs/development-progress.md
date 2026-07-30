@@ -48,18 +48,18 @@
 
 ## P3 单文件命令：inspect、validate、edit
 
-- [ ] **P3.1 实现 inspect 默认摘要**：依赖 P2.2、P2.9；完成条件：输出文件、患者、检查、序列和像素摘要，合成 DICOM 快照测试通过。
-- [ ] **P3.2 实现 inspect 筛选能力**：依赖 P3.1、P1.7；完成条件：`--all`、关键字/十六进制 `--tag` 与规则标签 profile 均有测试。
-- [ ] **P3.3 完成 inspect 命令输出**：依赖 P3.1、P2.9；完成条件：文本、JSON、`--output` 可用，目录输入返回退出码 2。
-- [ ] **P3.4 实现 validate 结果收集器**：依赖 P2.2；完成条件：单文件多个独立问题能一次全部返回。
-- [ ] **P3.5 实现 validate 基础检查**：依赖 P3.4；完成条件：解析、FMI、传输语法、VR/VM 和必填值检查都包含来源、路径、级别和消息。
-- [ ] **P3.6 接入标准与自定义校验规则**：依赖 P3.5、P1.8；完成条件：内置 SOP Class/IOD 规则无外部文件仍执行，`validate.profiles` 正确叠加。
-- [ ] **P3.7 完成 validate 命令输出与退出码**：依赖 P3.4-P3.6、P2.9；完成条件：文本/JSON/文件报告可用，严格 warning 与普通模式的退出码测试通过。
-- [ ] **P3.8 实现 edit 基础操作**：依赖 P2.2-P2.4；完成条件：set、clear、delete、嵌套序列路径写出后重新读取断言通过。
-- [ ] **P3.9 实现 edit 的 VR 与 UID 操作**：依赖 P2.4-P2.6、P3.8；完成条件：标准 Tag 自动 VR、私有显式 VR、UID 生成和文件内重映射均有测试。
-- [ ] **P3.10 实现 edit 字符集处理**：依赖 P3.8；完成条件：`--charset` 更新 SpecificCharacterSet 并重编码文本 VR，`--input-charset` 覆盖源解释。
-- [ ] **P3.11 完成 edit 命令安全边界**：依赖 P3.8-P3.10、P2.8；完成条件：只接受单文件，不读取规则 profile，不允许输入同路径输出，源文件保持不变。
-- [ ] **P3.12 验收 P3**：依赖 P3.1-P3.11；完成条件：`go test ./internal/app ./internal/validate ./cmd/dicom-cli ./tests/integration -run 'Inspect|Validate|Edit'` 成功。
+- [x] **P3.1 实现 inspect 默认摘要**：依赖 P2.2、P2.9；完成条件：输出文件、患者、检查、序列和像素摘要，合成 DICOM 快照测试通过。
+- [x] **P3.2 实现 inspect 筛选能力**：依赖 P3.1、P1.7；完成条件：`--all`、关键字/十六进制 `--tag` 与规则标签 profile 均有测试。
+- [x] **P3.3 完成 inspect 命令输出**：依赖 P3.1、P2.9；完成条件：文本、JSON、`--output` 可用，目录输入返回退出码 2。
+- [x] **P3.4 实现 validate 结果收集器**：依赖 P2.2；完成条件：单文件多个独立问题能一次全部返回。
+- [x] **P3.5 实现 validate 基础检查**：依赖 P3.4；完成条件：解析、FMI、传输语法、VR/VM 和必填值检查都包含来源、路径、级别和消息。
+- [x] **P3.6 接入标准与自定义校验规则**：依赖 P3.5、P1.8；完成条件：内置 SOP Class/IOD 规则无外部文件仍执行，`validate.profiles` 正确叠加。
+- [x] **P3.7 完成 validate 命令输出与退出码**：依赖 P3.4-P3.6、P2.9；完成条件：文本/JSON/文件报告可用，严格 warning 与普通模式的退出码测试通过。
+- [x] **P3.8 实现 edit 基础操作**：依赖 P2.2-P2.4；完成条件：set、clear、delete、嵌套序列路径写出后重新读取断言通过。
+- [x] **P3.9 实现 edit 的 VR 与 UID 操作**：依赖 P2.4-P2.6、P3.8；完成条件：标准 Tag 自动 VR、私有显式 VR、UID 生成和文件内重映射均有测试。
+- [x] **P3.10 实现 edit 字符集处理**：依赖 P3.8；完成条件：`--charset` 更新 SpecificCharacterSet 并重编码文本 VR，`--input-charset` 覆盖源解释。
+- [x] **P3.11 完成 edit 命令安全边界**：依赖 P3.8-P3.10、P2.8；完成条件：只接受单文件，不读取规则 profile，不允许输入同路径输出，源文件保持不变。
+- [x] **P3.12 验收 P3**：依赖 P3.1-P3.11；完成条件：`go test ./internal/app ./internal/validate ./cmd/dicom-cli ./tests/integration -run 'Inspect|Validate|Edit'` 成功。
 
 ## P4 脱敏
 

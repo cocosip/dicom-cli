@@ -90,6 +90,9 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	flags.StringVar(&options.logFormat, "log-format", "text", "log format: text or json")
 	command.AddCommand(newConfigCommand(runtime, &options))
 	command.AddCommand(newRulesCommand(runtime, &options))
+	command.AddCommand(newInspectCommand(runtime, &options))
+	command.AddCommand(newValidateCommand(runtime, &options))
+	command.AddCommand(newEditCommand(runtime, &options))
 
 	return command
 }
