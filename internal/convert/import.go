@@ -29,7 +29,7 @@ type ImportedImage struct {
 
 // LoadImage accepts only the raster formats and pixel layouts supported by
 // convert dicom: 8-bit grayscale/RGB PNG or JPEG and 16-bit grayscale PNG.
-func LoadImage(path string) (ImportedImage, error) {
+func LoadImage(path string) (result ImportedImage, err error) {
 	extension := strings.ToLower(filepath.Ext(path))
 	if extension != ".png" && extension != ".jpg" && extension != ".jpeg" {
 		return ImportedImage{}, fmt.Errorf("unsupported image format %q", extension)
@@ -38,7 +38,12 @@ func LoadImage(path string) (ImportedImage, error) {
 	if err != nil {
 		return ImportedImage{}, err
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); err == nil && closeErr != nil {
+			result = ImportedImage{}
+			err = closeErr
+		}
+	}()
 	imageValue, format, err := image.Decode(file)
 	if err != nil {
 		return ImportedImage{}, err
