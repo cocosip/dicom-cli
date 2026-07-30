@@ -104,12 +104,26 @@
 
 ## P7 发布与最终验收
 
-- [ ] **P7.1 编写 README**：依赖 P0-P6；完成条件：安装、命令、配置/规则示例、二进制输出和退出码与实际 `--help` 一致。
-- [ ] **P7.2 实现 Windows/Linux 打包**：依赖 P0.1、P7.1；完成条件：ZIP/tar.gz 均含可执行文件、README、配置和规则示例，archive smoke test 成功。
-- [ ] **P7.3 建立 CI**：依赖 P7.2；完成条件：Windows/Linux 执行格式检查、单元测试、合成集成测试和发布构建。
+- [x] **P7.1 编写 README**：依赖 P0-P6；已满足安装、命令、配置/规则示例、二进制输出和退出码与实际 `--help` 一致的完成条件。
+  - [x] **P7.1.1 定义 README 首次运行路径**：已创建仓库根目录 `README.md`，说明 GitHub Release 下载、Windows/Linux/macOS 的五个目标包、解压后的目录结构和最小 `inspect`、`config init`、`rules init` 示例。
+  - [x] **P7.1.2 编写完整命令使用手册**：已创建 `docs/usage.md`，按全局参数、配置、规则、单文件命令、批处理命令、转换/转码、DIMSE、输入输出与退出码分节；命令参数、输出和限制均以源码与 `--help` 为准。
+  - [x] **P7.1.3 校核文档命令契约**：已在当前编译出的 `dicom-cli` 上运行根命令和 21 个业务子命令的 `--help`，并以全仓测试中的退出码覆盖核对 README/手册；不将 Cobra 的 `completion` 作为业务命令文档承诺。
+- [x] **P7.2 实现五平台打包**：依赖 P0.1、P7.1；已生成并校验 Windows ZIP 与 Linux/macOS tar.gz，均含可执行文件、README、完整手册、配置和规则示例。
+  - [x] **P7.2.1 实现可重复归档器**：已创建 `cmd/release-packager/main.go`，接受 `--version` 和 `--output`，使用 `go build -trimpath -buildvcs=false` 为 `windows/amd64`、`linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 生成二进制，并按 `dicom-cli_<version>_<goos>_<goarch>` 组装归档。
+  - [x] **P7.2.2 将运行资料纳入每个归档**：归档器已复制根目录 `README.md`、`docs/usage.md`、`examples/dicom-cli.yaml`、`examples/dicom-cli-rules.yaml`；仅 Windows 归档中的二进制使用 `dicom-cli.exe`，其余为 `dicom-cli`。
+  - [x] **P7.2.3 实现归档 smoke test**：已创建 `cmd/release-packager/main_test.go`，验证 ZIP/tar.gz 的唯一根目录、可执行文件、README、手册和两个示例；归档器创建真实发布包后再次验证完整文件清单，Release 工作流会解压 Linux AMD64 包并运行 `dicom-cli --help`。
+  - [x] **P7.2.4 运行本地归档验收**：已执行 `go run ./cmd/release-packager --version 0.0.0-vcs-clean --output <临时目录>`，退出码为 0 并生成五个归档。
+- [ ] **P7.3 建立 GitHub Actions CI/CD**：依赖 P7.2；完成条件：`master` 上的 Windows/Linux/macOS 执行格式检查、单元测试、合成集成测试和本机构建；`v*` Tag 创建 GitHub Release 并上传五个归档。
+  - [x] **P7.3.1 建立 master CI 工作流**：已创建 `.github/workflows/ci.yml`，仅由 `push.branches: [master]` 触发，使用 `windows-latest`、`ubuntu-latest`、`macos-latest` 矩阵和 `actions/setup-go` 的 `go-version-file: go.mod`。
+  - [x] **P7.3.2 固化 CI 验证命令**：已在每个 CI 矩阵目标定义 `gofmt -l` 的空输出检查、`go vet ./...`、`go test ./...` 和 `go build ./cmd/dicom-cli`；`tests/workflows` 验证该命令契约，测试只使用仓库 fixture，不读取真实样本、PACS 地址或凭据。
+  - [x] **P7.3.3 建立 Tag 发布工作流**：已创建 `.github/workflows/release.yml`，仅由 `push.tags: ['v*']` 触发，授予 `contents: write`，在 Ubuntu runner 上调用 `go run ./cmd/release-packager`，并以 GitHub CLI 创建同名非草稿 Release、上传五个归档和 GitHub 自动生成的 Release Notes。
+  - [x] **P7.3.4 校验工作流静态内容**：已由 `tests/workflows` 解析两份 YAML 并确认触发条件、目标矩阵、发布版本来源和 GitHub CLI 命令；未发现硬编码 Token、样本路径、PACS 地址或凭据。
 - [ ] **P7.4 建立可选外部测试入口**：依赖 P4.7、P5.14、P6.11；完成条件：真实样本/PACS 参数缺失时跳过，提供环境变量时执行，均不硬编码路径或地址。
-- [ ] **P7.5 Windows 全量验收**：依赖 P3.12、P4.6、P5.13、P6.10、P7.1-P7.3；完成条件：`go test`、`go vet`、`go build` 和打包 smoke test 证据完整。
-- [ ] **P7.6 Linux 全量验收**：依赖 P7.5；完成条件：Linux CI 或环境中的同等测试证据完整。
+  - [ ] **P7.4.1 定义外部验收环境变量与运行说明**：创建 `docs/external-validation.md`，定义 `DICOM_CLI_EXTERNAL_DICOM_DIR`、`DICOM_CLI_EXTERNAL_PACS_HOST`、`DICOM_CLI_EXTERNAL_PACS_PORT`、`DICOM_CLI_EXTERNAL_CALLING_AE` 和 `DICOM_CLI_EXTERNAL_CALLED_AE` 的用途、必填组合和运行命令。
+  - [ ] **P7.4.2 实现受 build tag 保护的外部测试**：创建 `tests/external` 下的 `external_test.go`，要求 `external` build tag；缺少真实样本目录时跳过样本回归，缺少任一 PACS 参数时跳过 PACS 验收，输出文件始终写入 `t.TempDir()`。
+  - [ ] **P7.4.3 验收无外部条件的跳过行为**：执行 `go test -tags=external ./tests/external` 且不设置上述变量，断言命令成功并显示跳过原因；该命令不加入常规 CI。
+- [ ] **P7.5 Windows 全量验收**：依赖 P3.12、P4.6、P5.13、P6.10、P7.1-P7.3；完成条件：Windows 上 `go test ./...`、`go vet ./...`、`go build ./cmd/dicom-cli` 和 Windows ZIP 清单 smoke test 证据完整。
+- [ ] **P7.6 Linux 全量验收**：依赖 P7.5；完成条件：Linux CI 上 `go test ./...`、`go vet ./...`、`go build ./cmd/dicom-cli`、五平台归档和 Linux AMD64 解压执行 smoke test 证据完整。
 - [ ] **P7.7 脱敏真实样本验收**：依赖 P4.7、P7.5；阻塞原因：等待样本到位后记录执行命令、版本和结果。
 - [ ] **P7.8 真实 PACS 验收**：依赖 P6.11、P7.5；阻塞原因：等待 PACS 参数到位后记录目标、测试范围和结果。
 - [ ] **P7.9 第一版发布判定**：依赖 P7.5-P7.8；完成条件：全部非阻塞项完成，HTJ2K experimental 和未覆盖项写入发布说明。

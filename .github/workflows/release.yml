@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test release packager
+        run: go test ./cmd/release-packager
+
+      - name: Build release archives
+        run: go run ./cmd/release-packager --version "${GITHUB_REF_NAME#v}" --output dist
+
+      - name: Smoke test Linux archive
+        shell: bash
+        run: |
+          mkdir smoke
+          tar -xzf "dist/dicom-cli_${GITHUB_REF_NAME#v}_linux_amd64.tar.gz" -C smoke
+          "smoke/dicom-cli_${GITHUB_REF_NAME#v}_linux_amd64/dicom-cli" --help
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/dicom-cli_${GITHUB_REF_NAME#v}_windows_amd64.zip" \
+            "dist/dicom-cli_${GITHUB_REF_NAME#v}_linux_amd64.tar.gz" \
+            "dist/dicom-cli_${GITHUB_REF_NAME#v}_linux_arm64.tar.gz" \
+            "dist/dicom-cli_${GITHUB_REF_NAME#v}_darwin_amd64.tar.gz" \
+            "dist/dicom-cli_${GITHUB_REF_NAME#v}_darwin_arm64.tar.gz" \
+            --generate-notes --title "$GITHUB_REF_NAME"
