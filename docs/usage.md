@@ -16,14 +16,19 @@
 | `--log-format text|json` | 选择 stderr 日志格式，默认 `text`。 |
 
 `--verbose` 与 `--quiet` 不能同时使用。业务结果写入 stdout，日志和 `send`
-进度写入 stderr；调用脚本应按此分流。运行配置使用命令行覆盖、
-`DICOM_CLI_*` 环境变量、配置文件和默认值的优先级。
+进度写入 stderr；调用脚本应按此分流。
+
+运行配置文件按 `--config`、`DICOM_CLI_CONFIG`、当前目录
+`dicom-cli.yaml`、用户配置目录 `dicom-cli.yaml`、内置默认值的顺序选择，
+只会加载其中一个文件而不会合并多个文件。对于 `echo` 和 `send` 的目标字段，
+命令行覆盖值优先于 `DICOM_CLI_TARGET`、`DICOM_CLI_HOST`、`DICOM_CLI_PORT`、
+`DICOM_CLI_CALLING_AE`、`DICOM_CLI_CALLED_AE` 等环境变量，再优先于所选配置和默认值。
 
 ## 配置与规则
 
 `config init [path]` 生成 YAML 配置；加 `--format json` 生成 JSON，已有文件只有
-传 `--force` 才允许覆盖。`config validate [path]` 校验配置。未传路径时，配置查找
-优先当前目录，其次用户配置目录；`--config` 指定路径优先。
+传 `--force` 才允许覆盖。`config validate [path]` 校验配置。目标维护命令需要已存在的
+配置文件；可通过 `--config` 或 `DICOM_CLI_CONFIG` 显式指定。
 
 命名 PACS 目标通过以下命令维护：
 
@@ -41,6 +46,8 @@ dicom-cli config target remove local-pacs
 [`examples/dicom-cli.yaml`](../examples/dicom-cli.yaml) 复制完整示例。
 
 `rules init [path]` 和 `rules validate [path]` 的覆盖与格式行为和 `config` 相同。
+未传路径时，规则文件按 `--rules`、`DICOM_CLI_RULES`、当前目录
+`dicom-cli-rules.yaml`、用户配置目录 `dicom-cli-rules.yaml` 的顺序查找。
 规则文件包含 `filters`、`inspect.profiles`、`anonymize.profiles`、
 `validate.profiles` 与 `dicom_templates`；未知字段会被拒绝。完整示例见
 [`examples/dicom-cli-rules.yaml`](../examples/dicom-cli-rules.yaml)。
@@ -84,7 +91,8 @@ dicom-cli edit image.dcm --generate-uid StudyInstanceUID --uid-root 1.2.156.1126
 `--delete` 和 `--generate-uid` 接受可重复的 TagPath；标准 Tag 自动推断 VR，私有
 或未知 Tag 需要 `--vr TagPath=VR`。`--remap-uids` 重映射文件中的 UID 值。
 `--charset` 设置输出字符集，`--input-charset` 覆盖输入字符集解释。输入路径不能
-与输出路径相同。
+与输出路径相同，且至少需要一个编辑操作。未传 `--output` 时，结果写入当前目录下的
+`edit` 子目录。
 
 ## anonymize
 
@@ -109,8 +117,9 @@ dicom-cli anonymize --profile basic --recursive --filter ct-images --output anon
 - `clean-structured-content`
 - `clean-graphics`
 
-目录输出默认保留输入相对层级；`--flatten` 改为平铺并自动处理重名。`--filter`
-仅用于目录输入。`--fail-fast` 在首个文件失败时停止，默认继续处理其余文件。
+目录输出默认保留输入相对层级；`--flatten` 改为平铺并自动处理重名。`--filter` 从规则
+文件选择命名筛选条件，可用于单文件和目录输入。`--fail-fast` 在首个文件失败时停止，
+默认继续处理其余文件。未传 `--output` 时，结果写入当前目录下的 `anonymize` 子目录。
 `--report` 写出可能包含敏感前后值和 UID 映射的详细报告，应妥善保护；`--json`
 只输出汇总。单文件可以用 `--output -` 将二进制 DICOM 写到 stdout，多个二进制结果
 不能写到 stdout。
@@ -131,7 +140,8 @@ dicom-cli convert json --output metadata.json image.dcm
 
 两个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
 `--output`。目录默认不递归。图片二进制 stdout 要求恰好一个结果；多帧、多文件和
-目录输入不得使用 `--output -`。
+目录输入不得使用 `--output -`。未传 `--output` 时，结果写入当前目录下的 `convert`
+子目录。
 
 ### encapsulate
 
@@ -144,6 +154,8 @@ dicom-cli encapsulate image --patient-name ANON^PATIENT --output image.dcm sourc
 `--reference` 提供 PatientName。输出固定为未压缩的 Explicit VR Little Endian；
 不提供传输语法或压缩选项。目录模式支持 `--recursive`、`--flatten`、`--fail-fast` 和
 `--output`，并在一次调用内共享新 Study/Series UID、为每张图片生成独立 SOP Instance UID。
+单图输出路径必须使用 `.dcm` 扩展名；未传 `--output` 时，结果写入当前目录下的
+`convert` 子目录。
 
 ### transcode
 
@@ -154,10 +166,11 @@ dicom-cli transcode --to 1.2.840.10008.1.2.1 --output output study
 ```
 
 `transcode formats` 显示当前二进制实际注册的传输语法、别名和编码/解码能力，
-可加 `--json`。`--to` 仅用于 `transcode`，接受 `transcode formats` 输出的别名或标准
-传输语法 UID，例如 `--to rle` 或 `--to 1.2.840.10008.1.2.1`。`transcode <file>`
-接受单文件或目录；目录模式支持 `--recursive`、`--flatten`、`--filter`、`--fail-fast`。
-转码只改变与编解码和传输语法有关的数据；输出路径不得是输入路径。
+可加 `--json`。执行转码时 `--to` 和 `--output` 都必填；`--to` 接受
+`transcode formats` 输出的别名或标准传输语法 UID，例如 `--to rle` 或
+`--to 1.2.840.10008.1.2.1`。`transcode <file>` 接受单文件或目录；目录模式支持
+`--recursive`、`--flatten`、`--filter`、`--fail-fast`。转码只改变与编解码和传输语法
+有关的数据；输出路径不得是输入路径。
 
 HTJ2K 显示为 experimental。能列出或完成合成样本转码不等于已验证真实样本互操作。
 
@@ -183,6 +196,17 @@ dicom-cli send --target local-pacs --config dicom-cli.yaml --recursive study
 实例数，`--concurrency` 控制并行 Association 数，`--retries` 只重试网络、超时或
 Association 中断。PACS 返回的 C-STORE 状态失败不会重试。目标不接受源传输语法时，
 `send` 不会隐式转码；请先执行 `transcode`。
+
+## Shell 自动补全
+
+`completion` 输出指定 shell 的补全脚本，支持 `bash`、`zsh`、`fish` 和 `powershell`。
+例如可在 PowerShell 中执行：
+
+```powershell
+dicom-cli completion powershell > dicom-cli-completion.ps1
+```
+
+补全脚本的加载方式取决于所用 shell 的配置；生成脚本不会修改当前 shell 配置。
 
 ## 批处理、输出与退出码
 
