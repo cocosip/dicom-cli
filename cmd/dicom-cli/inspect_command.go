@@ -8,12 +8,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/dicom-cli/internal/inspect"
 	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 )
 
-func newInspectCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+func newInspectCommand(runtime Runtime, root *rootOptions, localizer i18n.Localizer) *cobra.Command {
 	var all bool
 	var tags []string
 	var profile string
@@ -21,8 +22,8 @@ func newInspectCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	var destination string
 	command := &cobra.Command{
 		Use:   "inspect <file>",
-		Short: "Inspect a single DICOM file",
-		Long:  "Inspect one DICOM file and report patient, study, series, instance, and pixel metadata. Inspection never modifies the source file. Use --tag or --profile to select additional elements.",
+		Short: localizer.Text(i18n.InspectShort),
+		Long:  localizer.Text(i18n.InspectLong),
 		Example: "  dicom-cli inspect image.dcm\n" +
 			"  dicom-cli inspect --tag PatientName --tag 0040,A730[0].0040,A160 image.dcm",
 		Args: cobra.ExactArgs(1),
@@ -53,22 +54,23 @@ func newInspectCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
-			content, err := renderInspect(report, asJSON)
+			content, err := renderInspect(report, asJSON, localizer)
 			if err != nil {
 				return err
 			}
 			return writeReport(runtime, args[0], destination, content)
 		},
 	}
-	command.Flags().BoolVar(&all, "all", false, "include every data element")
-	command.Flags().StringArrayVar(&tags, "tag", nil, "DICOM keyword or hexadecimal Tag path")
-	command.Flags().StringVarP(&profile, "profile", "p", "", "inspect profile from rules")
-	command.Flags().BoolVarP(&asJSON, "json", "j", false, "write JSON")
-	command.Flags().StringVarP(&destination, "output", "o", "", "report output path")
+	localizedHelpFlag(command, localizer)
+	command.Flags().BoolVar(&all, "all", false, localizer.Text(i18n.FlagInspectAll))
+	command.Flags().StringArrayVar(&tags, "tag", nil, localizer.Text(i18n.FlagInspectTag))
+	command.Flags().StringVarP(&profile, "profile", "p", "", localizer.Text(i18n.FlagInspectProfile))
+	command.Flags().BoolVarP(&asJSON, "json", "j", false, localizer.Text(i18n.FlagJSON))
+	command.Flags().StringVarP(&destination, "output", "o", "", localizer.Text(i18n.FlagReportOutput))
 	return command
 }
 
-func renderInspect(report inspect.Report, asJSON bool) ([]byte, error) {
+func renderInspect(report inspect.Report, asJSON bool, localizer i18n.Localizer) ([]byte, error) {
 	if asJSON {
 		return json.MarshalIndent(report, "", "  ")
 	}
@@ -136,5 +138,5 @@ func renderInspect(report inspect.Report, asJSON bool) ([]byte, error) {
 	for _, elem := range report.Tags {
 		lines = append(lines, fmt.Sprintf("%s %s %s = %s", elem.Tag, elem.VR, elem.Path, elem.Value))
 	}
-	return []byte(strings.Join(lines, "\n") + "\n"), nil
+	return []byte(localizer.ReplaceInspectLabels(strings.Join(lines, "\n") + "\n")), nil
 }

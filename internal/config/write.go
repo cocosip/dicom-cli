@@ -26,6 +26,7 @@ func Write(path string, config Config, format string) error {
 
 	document := configurationDocument{
 		Version:  config.Version,
+		Language: config.Language,
 		UIDRoot:  config.UIDRoot,
 		Timeouts: durationDocumentFrom(config.Timeouts),
 		Targets:  make(map[string]targetDocument, len(config.Targets)),
@@ -66,6 +67,7 @@ func Write(path string, config Config, format string) error {
 
 type configurationDocument struct {
 	Version  string                    `json:"version" yaml:"version"`
+	Language string                    `json:"language" yaml:"language"`
 	UIDRoot  string                    `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Timeouts durationDocument          `json:"timeouts,omitempty" yaml:"timeouts,omitempty"`
 	Targets  map[string]targetDocument `json:"targets" yaml:"targets"`

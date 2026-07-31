@@ -16,6 +16,7 @@ import (
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	"github.com/cocosip/dicom-cli/internal/dicom"
 	"github.com/cocosip/dicom-cli/internal/files"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/element"
@@ -147,10 +148,10 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			}
 			result := anonymizeSummary{Scanned: summary.Scanned, Processed: summary.Processed, Skipped: summary.Skipped, Failed: summary.Failed, Skips: summary.Skips}
 			if destination == "-" {
-				if err := writeAnonymizeSummary(runtime.Stderr, result, asJSON); err != nil {
+				if err := writeAnonymizeSummary(runtime.Stderr, result, asJSON, root.localizer); err != nil {
 					return err
 				}
-			} else if err := writeAnonymizeSummary(runtime.Stdout, result, asJSON); err != nil {
+			} else if err := writeAnonymizeSummary(runtime.Stdout, result, asJSON, root.localizer); err != nil {
 				return err
 			}
 			if summary.Failed > 0 {
@@ -253,11 +254,11 @@ func anonymizeSingleOutput(input, destination string, directoryInput bool) (stri
 	return destination, nil
 }
 
-func writeAnonymizeSummary(writer io.Writer, summary anonymizeSummary, asJSON bool) error {
+func writeAnonymizeSummary(writer io.Writer, summary anonymizeSummary, asJSON bool, localizer i18n.Localizer) error {
 	if asJSON {
 		return json.NewEncoder(writer).Encode(summary)
 	}
-	_, err := fmt.Fprintf(writer, "scanned=%d processed=%d skipped=%d failed=%d\n", summary.Scanned, summary.Processed, summary.Skipped, summary.Failed)
+	_, err := fmt.Fprintln(writer, localizer.BatchSummary(summary.Scanned, summary.Processed, summary.Skipped, summary.Failed))
 	return err
 }
 

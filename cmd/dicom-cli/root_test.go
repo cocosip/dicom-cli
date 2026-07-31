@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -18,6 +20,70 @@ func TestExecuteHelpListsP0GlobalFlags(t *testing.T) {
 		if !strings.Contains(stdout.String(), flag) {
 			t.Fatalf("help output does not contain %q:\n%s", flag, stdout.String())
 		}
+	}
+}
+
+func TestExecuteUsesConfiguredLanguageForHelp(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dicom-cli.yaml")
+	if err := os.WriteFile(path, []byte("version: v1\nlanguage: zh-CN\ntargets: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runtime, stdout, stderr := testRuntime()
+
+	if code := Execute([]string{"--config", path, "inspect", "--help"}, runtime); code != 0 {
+		t.Fatalf("Execute() = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "查看一个 DICOM 文件") {
+		t.Fatalf("Chinese help = %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "用法：") || !strings.Contains(stdout.String(), "选项：") {
+		t.Fatalf("Chinese help headings = %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "输出 JSON") {
+		t.Fatalf("Chinese flag help = %q", stdout.String())
+	}
+	if code := Execute([]string{"--config", path, "--help"}, runtime); code != 0 {
+		t.Fatalf("root help Execute() = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "管理运行配置") {
+		t.Fatalf("Chinese command list = %q", stdout.String())
+	}
+}
+
+func TestExecuteUsesConfiguredLanguageForDiagnostics(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dicom-cli.yaml")
+	if err := os.WriteFile(path, []byte("version: v1\nlanguage: zh-CN\ntargets: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runtime, _, stderr := testRuntime()
+
+	if code := Execute([]string{"--config", path, "--verbose", "--quiet"}, runtime); code != 2 {
+		t.Fatalf("Execute() = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "不能同时使用") {
+		t.Fatalf("Chinese diagnostic = %q", stderr.String())
+	}
+}
+
+func TestExecuteUsesConfigValidatePathForHelpLanguage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dicom-cli.yaml")
+	if err := os.WriteFile(path, []byte("version: v1\nlanguage: zh-CN\ntargets: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runtime, stdout, stderr := testRuntime()
+
+	if code := Execute([]string{"config", "validate", path}, runtime); code != 0 {
+		t.Fatalf("Execute() = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "配置有效") {
+		t.Fatalf("localized config validate output = %q", stdout.String())
+	}
+	runtime, stdout, stderr = testRuntime()
+	if code := Execute([]string{"config", "validate", path, "--help"}, runtime); code != 0 {
+		t.Fatalf("help Execute() = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "校验一个运行配置文件") {
+		t.Fatalf("localized config validate help = %q", stdout.String())
 	}
 }
 
@@ -140,8 +206,8 @@ func TestExecuteUsesInjectedRuntime(t *testing.T) {
 	if code := Execute([]string{"--help"}, runtime); code != 0 {
 		t.Fatalf("Execute(--help) = %d, want 0", code)
 	}
-	if cwdCalls != 0 || envCalls != 0 {
-		t.Fatalf("Getwd calls = %d, LookupEnv calls = %d, want 0", cwdCalls, envCalls)
+	if cwdCalls == 0 || envCalls == 0 {
+		t.Fatalf("Getwd calls = %d, LookupEnv calls = %d, want configuration discovery", cwdCalls, envCalls)
 	}
 }
 

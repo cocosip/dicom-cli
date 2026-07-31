@@ -9,6 +9,25 @@ import (
 	"github.com/cocosip/dicom-cli/internal/testutil"
 )
 
+func TestExecuteInspectUsesConfiguredLanguageForTextReport(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "dicom-cli.yaml")
+	if err := os.WriteFile(path, []byte("version: v1\nlanguage: zh-CN\ntargets: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runtime, stdout, stderr := testRuntime()
+
+	if code := Execute([]string{"--config", path, "inspect", fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("inspect exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "[文件]") || !strings.Contains(stdout.String(), "传输语法：") {
+		t.Fatalf("localized inspect output = %q", stdout.String())
+	}
+}
+
 func TestExecuteInspectWritesJSONAndRejectsDirectory(t *testing.T) {
 	directory := t.TempDir()
 	fixtures, err := testutil.CreateDICOMFixtures(directory)

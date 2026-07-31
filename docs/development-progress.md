@@ -108,6 +108,7 @@
   - [x] **P7.1.1 定义 README 首次运行路径**：已创建仓库根目录 `README.md`，说明 GitHub Release 下载、Windows/Linux/macOS 的五个目标包、解压后的目录结构和最小 `inspect`、`config init`、`rules init` 示例。
   - [x] **P7.1.2 编写完整命令使用手册**：已创建 `docs/usage.md`，按全局参数、配置、规则、单文件命令、批处理命令、转换/转码、DIMSE、输入输出与退出码分节；命令参数、输出和限制均以源码与 `--help` 为准。
   - [x] **P7.1.3 校核文档命令契约**：已在当前编译出的 `dicom-cli` 上运行根命令和 21 个业务子命令的 `--help`，并以全仓测试中的退出码覆盖核对 README/手册；不将 Cobra 的 `completion` 作为业务命令文档承诺。
+  - [x] **P7.1.4 配置驱动中英文提示**：运行配置新增 `language: en|zh-CN`，帮助、文本报告、批处理汇总和本工具生成的诊断按所选配置本地化；命令/flag、JSON、退出码和 DICOM 标识保持稳定。已通过 `go test ./... -count=1`。
 - [x] **P7.2 实现五平台打包**：依赖 P0.1、P7.1；已生成并校验 Windows ZIP 与 Linux/macOS tar.gz，均含可执行文件、README、完整手册、配置和规则示例。
   - [x] **P7.2.1 实现可重复归档器**：已创建 `cmd/release-packager/main.go`，接受 `--version` 和 `--output`，使用 `go build -trimpath -buildvcs=false` 为 `windows/amd64`、`linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 生成二进制，并按 `dicom-cli_<version>_<goos>_<goarch>` 组装归档。
   - [x] **P7.2.2 将运行资料纳入每个归档**：归档器已复制根目录 `README.md`、`docs/usage.md`、`examples/dicom-cli.yaml`、`examples/dicom-cli-rules.yaml`；仅 Windows 归档中的二进制使用 `dicom-cli.exe`，其余为 `dicom-cli`。

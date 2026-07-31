@@ -18,6 +18,11 @@
 `--verbose` 与 `--quiet` 不能同时使用。业务结果写入 stdout，日志和 `send`
 进度写入 stderr；调用脚本应按此分流。
 
+帮助、文本结果、进度和本工具生成的诊断使用运行配置根字段 `language`：`en`
+为默认英文，`zh-CN` 为简体中文。语言随所选配置文件切换，`--config` 仍只负责
+选择配置文件；命令名、flag 名、JSON 字段和值、退出码、规则 DSL、DICOM Tag 和 UID
+不随语言变化。配置不存在、无法读取或 `language` 非法时，诊断以英文输出。
+
 运行配置文件按 `--config`、`DICOM_CLI_CONFIG`、当前目录
 `dicom-cli.yaml`、用户配置目录 `dicom-cli.yaml`、内置默认值的顺序选择，
 只会加载其中一个文件而不会合并多个文件。对于 `echo` 和 `send` 的目标字段，

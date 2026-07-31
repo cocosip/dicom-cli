@@ -86,6 +86,15 @@ dicom-cli echo --config dicom-cli.yaml --target local-pacs
 完整参数、输入输出约定、配置优先级、DIMSE 超时和命令示例见
 [使用手册](docs/usage.md)。
 
+## 语言
+
+命令帮助、文本结果、进度和本工具生成的诊断由运行配置文件的根字段 `language`
+控制。支持 `en`（默认）和 `zh-CN`；命令行、JSON 字段和退出码保持不变。
+
+```yaml
+language: zh-CN
+```
+
 ## 退出码
 
 | 退出码 | 含义 |

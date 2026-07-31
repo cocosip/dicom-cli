@@ -17,6 +17,7 @@ import (
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	"github.com/cocosip/dicom-cli/internal/config"
 	"github.com/cocosip/dicom-cli/internal/files"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 )
@@ -48,7 +49,7 @@ func newEchoCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if asJSON {
 				return json.NewEncoder(runtime.Stdout).Encode(map[string]any{"host": target.Host, "port": target.Port, "status": "success"})
 			}
-			_, err = fmt.Fprintf(runtime.Stdout, "C-ECHO succeeded: %s:%d\n", target.Host, target.Port)
+			_, err = fmt.Fprintln(runtime.Stdout, root.localizer.Text(i18n.EchoSucceeded, target.Host, target.Port))
 			return err
 		},
 	}
@@ -86,7 +87,7 @@ func newSendCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if err != nil {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
-			report := app.Send(context.Background(), runtime.Stderr, target, entries, app.SendOptions{
+			report := app.Send(context.Background(), runtime.Stderr, root.localizer, target, entries, app.SendOptions{
 				MaxInstances: maxInstances,
 				Concurrency:  concurrency,
 				Retries:      retries,
@@ -105,7 +106,7 @@ func newSendCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if asJSON {
 				err = json.NewEncoder(runtime.Stdout).Encode(report)
 			} else {
-				_, err = fmt.Fprintf(runtime.Stdout, "scanned=%d processed=%d skipped=%d failed=%d\n", report.Scanned, report.Processed, report.Skipped, report.Failed)
+				_, err = fmt.Fprintln(runtime.Stdout, root.localizer.BatchSummary(report.Scanned, report.Processed, report.Skipped, report.Failed))
 			}
 			if err != nil {
 				return err

@@ -12,6 +12,7 @@ import (
 
 	"github.com/cocosip/dicom-cli/internal/config"
 	"github.com/cocosip/dicom-cli/internal/files"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
@@ -158,7 +159,7 @@ func Retryable(err error) bool {
 // Send parses selected files, sends them through reusable Associations, and
 // writes per-file progress to progress. DICOM wire operations are delegated to
 // go-dicom's network/client package through Open and Session.Store.
-func Send(ctx context.Context, progress io.Writer, target config.PACSTarget, entries []files.Entry, options SendOptions) SendReport {
+func Send(ctx context.Context, progress io.Writer, localizer i18n.Localizer, target config.PACSTarget, entries []files.Entry, options SendOptions) SendReport {
 	report := SendReport{Scanned: len(entries)}
 	var instances []Instance
 	for _, entry := range entries {
@@ -181,7 +182,7 @@ func Send(ctx context.Context, progress io.Writer, target config.PACSTarget, ent
 	groups := splitInstances(instances, options.MaxInstances)
 	if options.FailFast {
 		for _, group := range groups {
-			for _, result := range sendGroup(ctx, progress, target, group, options.Retries) {
+			for _, result := range sendGroup(ctx, progress, localizer, target, group, options.Retries) {
 				report.Files = append(report.Files, result)
 				if result.Error != "" {
 					report.Failed++
@@ -200,7 +201,7 @@ func Send(ctx context.Context, progress io.Writer, target config.PACSTarget, ent
 		go func() {
 			defer workers.Done()
 			for group := range jobs {
-				for _, result := range sendGroup(ctx, progress, target, group, options.Retries) {
+				for _, result := range sendGroup(ctx, progress, localizer, target, group, options.Retries) {
 					results <- result
 				}
 			}
@@ -241,12 +242,12 @@ func splitInstances(instances []Instance, maxInstances int) [][]Instance {
 	return groups
 }
 
-func sendGroup(ctx context.Context, progress io.Writer, target config.PACSTarget, group []Instance, retries int) []SendFileResult {
+func sendGroup(ctx context.Context, progress io.Writer, localizer i18n.Localizer, target config.PACSTarget, group []Instance, retries int) []SendFileResult {
 	session, err := Open(ctx, target, group)
 	if err != nil {
 		results := make([]SendFileResult, 0, len(group))
 		for _, instance := range group {
-			results = append(results, sendWithRetries(ctx, progress, target, instance, retries, err))
+			results = append(results, sendWithRetries(ctx, progress, localizer, target, instance, retries, err))
 		}
 		return results
 	}
@@ -255,21 +256,21 @@ func sendGroup(ctx context.Context, progress io.Writer, target config.PACSTarget
 	for _, instance := range group {
 		err := session.Store(ctx, instance)
 		if err == nil {
-			_, _ = fmt.Fprintf(progress, "sent %s\n", instance.Path)
+			_, _ = fmt.Fprintln(progress, localizer.ProgressSent(instance.Path))
 			results = append(results, SendFileResult{Path: instance.Path, Attempts: 1})
 			continue
 		}
-		results = append(results, sendWithRetries(ctx, progress, target, instance, retries, err))
+		results = append(results, sendWithRetries(ctx, progress, localizer, target, instance, retries, err))
 	}
 	return results
 }
 
-func sendWithRetries(ctx context.Context, progress io.Writer, target config.PACSTarget, instance Instance, retries int, initial error) SendFileResult {
+func sendWithRetries(ctx context.Context, progress io.Writer, localizer i18n.Localizer, target config.PACSTarget, instance Instance, retries int, initial error) SendFileResult {
 	err := initial
 	attempts := 1
 	for Retryable(err) && attempts <= retries {
 		attempts++
-		_, _ = fmt.Fprintf(progress, "retrying %s attempt=%d\n", instance.Path, attempts)
+		_, _ = fmt.Fprintln(progress, localizer.ProgressRetrying(instance.Path, attempts))
 		session, openErr := Open(ctx, target, []Instance{instance})
 		if openErr == nil {
 			err = session.Store(ctx, instance)
@@ -279,10 +280,10 @@ func sendWithRetries(ctx context.Context, progress io.Writer, target config.PACS
 		}
 	}
 	if err == nil {
-		_, _ = fmt.Fprintf(progress, "sent %s\n", instance.Path)
+		_, _ = fmt.Fprintln(progress, localizer.ProgressSent(instance.Path))
 		return SendFileResult{Path: instance.Path, Attempts: attempts}
 	}
-	_, _ = fmt.Fprintf(progress, "failed %s: %v\n", instance.Path, err)
+	_, _ = fmt.Fprintln(progress, localizer.ProgressFailed(instance.Path, err))
 	return SendFileResult{Path: instance.Path, Attempts: attempts, Error: err.Error()}
 }
 

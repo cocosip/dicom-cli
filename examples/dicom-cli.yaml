@@ -1,5 +1,6 @@
 # Copy this file to dicom-cli.yaml and replace the example target values.
 version: v1
+language: en
 uid: 1.2.156.112618
 
 timeouts:

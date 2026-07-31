@@ -5,10 +5,14 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
+	"github.com/cocosip/dicom-cli/internal/config"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/dicom-cli/internal/logging"
 )
 
@@ -40,15 +44,17 @@ type rootOptions struct {
 	verbose    bool
 	quiet      bool
 	logFormat  string
+	localizer  i18n.Localizer
 }
 
 // Execute runs the root command and returns the process exit code.
 func Execute(args []string, runtime Runtime) int {
-	command := NewRootCommand(runtime)
+	localizer := localizerForArgs(args, runtime)
+	command := NewRootCommand(runtime, localizer)
 	command.SetArgs(args)
 
 	if err := command.Execute(); err != nil {
-		_, _ = fmt.Fprintln(runtime.Stderr, err)
+		_, _ = fmt.Fprintln(runtime.Stderr, localizer.ReplaceDiagnostic(err.Error()))
 		return apperr.ExitCode(err)
 	}
 
@@ -56,13 +62,13 @@ func Execute(args []string, runtime Runtime) int {
 }
 
 // NewRootCommand builds the root Cobra command from injected process dependencies.
-func NewRootCommand(runtime Runtime) *cobra.Command {
-	options := rootOptions{logFormat: "text"}
+func NewRootCommand(runtime Runtime, localizer i18n.Localizer) *cobra.Command {
+	options := rootOptions{logFormat: "text", localizer: localizer}
 
 	command := &cobra.Command{
 		Use:           "dicom-cli",
-		Short:         "DICOM command-line utility",
-		Long:          "dicom-cli provides configuration, rules, file processing, and DIMSE operations. Use a subcommand's --help output for its input, output, and safety constraints.",
+		Short:         localizer.Text(i18n.RootShort),
+		Long:          localizer.Text(i18n.RootLong),
 		Args:          noArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -79,19 +85,21 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	command.SetIn(runtime.Stdin)
 	command.SetOut(runtime.Stdout)
 	command.SetErr(runtime.Stderr)
+	command.SetUsageTemplate(localizedUsageTemplate(localizer))
+	localizedHelpFlag(command, localizer)
 	command.SetFlagErrorFunc(func(*cobra.Command, error) error {
 		return apperr.Wrap(apperr.KindInput, fmt.Errorf("invalid command arguments"))
 	})
 
 	flags := command.PersistentFlags()
-	flags.StringVarP(&options.configPath, "config", "c", "", "configuration file")
-	flags.StringVarP(&options.rulesPath, "rules", "R", "", "rules file")
-	flags.BoolVarP(&options.verbose, "verbose", "v", false, "enable debug logging")
-	flags.BoolVarP(&options.quiet, "quiet", "q", false, "only log errors")
-	flags.StringVar(&options.logFormat, "log-format", "text", "log format: text or json")
+	flags.StringVarP(&options.configPath, "config", "c", "", localizer.Text(i18n.FlagConfig))
+	flags.StringVarP(&options.rulesPath, "rules", "R", "", localizer.Text(i18n.FlagRules))
+	flags.BoolVarP(&options.verbose, "verbose", "v", false, localizer.Text(i18n.FlagVerbose))
+	flags.BoolVarP(&options.quiet, "quiet", "q", false, localizer.Text(i18n.FlagQuiet))
+	flags.StringVar(&options.logFormat, "log-format", "text", localizer.Text(i18n.FlagLogFormat))
 	command.AddCommand(newConfigCommand(runtime, &options))
 	command.AddCommand(newRulesCommand(runtime, &options))
-	command.AddCommand(newInspectCommand(runtime, &options))
+	command.AddCommand(newInspectCommand(runtime, &options, localizer))
 	command.AddCommand(newValidateCommand(runtime, &options))
 	command.AddCommand(newAnonymizeCommand(runtime, &options))
 	command.AddCommand(newEditCommand(runtime, &options))
@@ -100,8 +108,104 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	command.AddCommand(newTranscodeCommand(runtime, &options))
 	command.AddCommand(newEchoCommand(runtime, &options))
 	command.AddCommand(newSendCommand(runtime, &options))
+	localizeCommandTree(command, localizer)
 
 	return command
+}
+
+func localizerForArgs(args []string, runtime Runtime) i18n.Localizer {
+	options, err := loadOptions(runtime, configuredConfigPath(args), nil)
+	if err != nil {
+		return i18n.New(i18n.English)
+	}
+	loaded, _, err := config.Load(options)
+	if err != nil {
+		return i18n.New(i18n.English)
+	}
+	return i18n.New(loaded.Language)
+}
+
+func configuredConfigPath(args []string) string {
+	for index, argument := range args {
+		switch {
+		case argument == "--config" || argument == "-c":
+			if index+1 < len(args) {
+				return args[index+1]
+			}
+		case len(argument) > len("--config=") && argument[:len("--config=")] == "--config=":
+			return argument[len("--config="):]
+		case len(argument) > 2 && argument[:2] == "-c":
+			return argument[2:]
+		}
+	}
+	for index := 0; index+2 < len(args); index++ {
+		if args[index] == "config" && args[index+1] == "validate" && !strings.HasPrefix(args[index+2], "-") {
+			return args[index+2]
+		}
+	}
+	return ""
+}
+
+func localizedUsageTemplate(localizer i18n.Localizer) string {
+	return fmt.Sprintf(`%s{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+%s
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+%s
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+%s{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+%s
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+%s
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+
+%s{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+%s{{end}}
+`,
+		localizer.Text(i18n.HelpUsage),
+		localizer.Text(i18n.HelpAliases),
+		localizer.Text(i18n.HelpExamples),
+		localizer.Text(i18n.HelpAvailableCommands),
+		localizer.Text(i18n.HelpFlags),
+		localizer.Text(i18n.HelpGlobalFlags),
+		localizer.Text(i18n.HelpAdditionalTopics),
+		localizer.Text(i18n.HelpMoreInformation, "{{.CommandPath}}"),
+	)
+}
+
+func localizedHelpFlag(command *cobra.Command, localizer i18n.Localizer) {
+	if command.Flags().Lookup("help") != nil {
+		return
+	}
+	command.Flags().BoolP("help", "h", false, localizer.Text(i18n.FlagHelp))
+}
+
+func localizeCommandTree(root *cobra.Command, localizer i18n.Localizer) {
+	if !localizer.IsChineseSimplified() {
+		return
+	}
+	var visit func(*cobra.Command)
+	visit = func(command *cobra.Command) {
+		localizedHelpFlag(command, localizer)
+		command.Short = localizer.CommandShort(command.CommandPath(), command.Short)
+		command.Long = localizer.CommandLong(command.CommandPath(), command.Long)
+		command.Flags().VisitAll(func(flag *pflag.Flag) {
+			flag.Usage = localizer.FlagUsage(flag.Name, flag.Usage)
+		})
+		for _, child := range command.Commands() {
+			visit(child)
+		}
+	}
+	visit(root)
 }
 
 func noArgs(_ *cobra.Command, args []string) error {

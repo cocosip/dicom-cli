@@ -10,6 +10,7 @@ import (
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	"github.com/cocosip/dicom-cli/internal/config"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 )
 
 func newConfigCommand(runtime Runtime, root *rootOptions) *cobra.Command {
@@ -75,7 +76,7 @@ func newConfigValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command
 			if err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
-			_, err = fmt.Fprintln(runtime.Stdout, "valid")
+			_, err = fmt.Fprintln(runtime.Stdout, root.localizer.Text(i18n.ConfigValid))
 			return err
 		},
 	}

@@ -12,6 +12,9 @@ func TestDefaultConfigUsesDIMSETimeoutDefaults(t *testing.T) {
 	if config.Version != VersionV1 {
 		t.Fatalf("Version = %q, want %q", config.Version, VersionV1)
 	}
+	if config.Language != LanguageEnglish {
+		t.Fatalf("Language = %q, want %q", config.Language, LanguageEnglish)
+	}
 	if config.UIDRoot != DefaultUIDRoot {
 		t.Fatalf("UIDRoot = %q, want %q", config.UIDRoot, DefaultUIDRoot)
 	}
@@ -23,6 +26,32 @@ func TestDefaultConfigUsesDIMSETimeoutDefaults(t *testing.T) {
 	}
 	if config.Timeouts.Idle != 5*time.Minute {
 		t.Fatalf("Idle = %s, want 5m", config.Timeouts.Idle)
+	}
+}
+
+func TestConfigValidateAcceptsSupportedLanguages(t *testing.T) {
+	for _, language := range []string{LanguageEnglish, LanguageChineseSimplified} {
+		t.Run(language, func(t *testing.T) {
+			config := DefaultConfig()
+			config.Language = language
+
+			if err := config.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestConfigValidateRejectsUnsupportedLanguage(t *testing.T) {
+	config := DefaultConfig()
+	config.Language = "fr"
+
+	err := config.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want validation error")
+	}
+	if !strings.Contains(err.Error(), "language") {
+		t.Fatalf("Validate() error = %q, want language error", err)
 	}
 }
 

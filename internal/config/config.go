@@ -9,13 +9,16 @@ import (
 )
 
 const (
-	VersionV1      = "v1"
-	DefaultUIDRoot = "1.2.156.112618"
+	VersionV1                 = "v1"
+	DefaultUIDRoot            = "1.2.156.112618"
+	LanguageEnglish           = "en"
+	LanguageChineseSimplified = "zh-CN"
 )
 
 // Config contains the runtime settings stored in dicom-cli configuration files.
 type Config struct {
 	Version  string                `json:"version" yaml:"version" mapstructure:"version"`
+	Language string                `json:"language" yaml:"language" mapstructure:"language"`
 	UIDRoot  string                `json:"uid" yaml:"uid" mapstructure:"uid"`
 	Timeouts Timeouts              `json:"timeouts" yaml:"timeouts" mapstructure:"timeouts"`
 	Targets  map[string]PACSTarget `json:"targets" yaml:"targets" mapstructure:"targets"`
@@ -68,8 +71,9 @@ type AuthConfig struct {
 // DefaultConfig returns the versioned defaults used when no value is configured.
 func DefaultConfig() Config {
 	return Config{
-		Version: VersionV1,
-		UIDRoot: DefaultUIDRoot,
+		Version:  VersionV1,
+		Language: LanguageEnglish,
+		UIDRoot:  DefaultUIDRoot,
 		Timeouts: Timeouts{
 			Connect:   10 * time.Second,
 			Associate: 30 * time.Second,
@@ -109,6 +113,9 @@ func (config Config) Validate() error {
 
 	if config.Version != VersionV1 {
 		validationErrors = append(validationErrors, fmt.Errorf("version must be %q", VersionV1))
+	}
+	if config.Language != LanguageEnglish && config.Language != LanguageChineseSimplified {
+		validationErrors = append(validationErrors, fmt.Errorf("language must be %q or %q", LanguageEnglish, LanguageChineseSimplified))
 	}
 	if !validOIDRoot(config.UIDRoot) {
 		validationErrors = append(validationErrors, fmt.Errorf("uid must be a dotted numeric OID"))
