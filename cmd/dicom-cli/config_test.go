@@ -145,7 +145,7 @@ func TestRootLanguageCommandPersistsLanguage(t *testing.T) {
 	}
 }
 
-func TestRootLanguageCommandCreatesUserConfigurationWhenNoneExists(t *testing.T) {
+func TestRootLanguageCommandCreatesWorkingDirectoryConfigurationWhenNoneExists(t *testing.T) {
 	workingDir := t.TempDir()
 	userConfigDir := filepath.Join(t.TempDir(), "dicom-cli")
 	runtime, stdout, stderr := testRuntime()
@@ -163,16 +163,16 @@ func TestRootLanguageCommandCreatesUserConfigurationWhenNoneExists(t *testing.T)
 		t.Fatalf("lang stdout = %q, want %q", stdout.String(), "language=zh-CN\n")
 	}
 
-	userConfigPath := filepath.Join(userConfigDir, "dicom-cli.yaml")
-	content, err := os.ReadFile(userConfigPath)
+	workingConfigPath := filepath.Join(workingDir, "dicom-cli.yaml")
+	content, err := os.ReadFile(workingConfigPath)
 	if err != nil {
-		t.Fatalf("ReadFile(%q): %v", userConfigPath, err)
+		t.Fatalf("ReadFile(%q): %v", workingConfigPath, err)
 	}
 	if !strings.Contains(string(content), "language: zh-CN") {
-		t.Fatalf("created user configuration = %q, want language setting", content)
+		t.Fatalf("created working directory configuration = %q, want language setting", content)
 	}
-	if _, err := os.Stat(filepath.Join(workingDir, "dicom-cli.yaml")); !os.IsNotExist(err) {
-		t.Fatalf("working directory configuration existence error = %v, want not exist", err)
+	if _, err := os.Stat(filepath.Join(userConfigDir, "dicom-cli.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("user configuration existence error = %v, want not exist", err)
 	}
 
 	runtime, stdout, stderr = testRuntime()

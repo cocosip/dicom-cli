@@ -372,5 +372,5 @@ func loadLanguageConfig(runtime Runtime, root *rootOptions) (config.Config, stri
 	if location.Path != "" {
 		return loaded, location.Path, nil
 	}
-	return loaded, filepath.Join(options.UserConfigDir, config.DefaultFileName), nil
+	return loaded, filepath.Join(options.WorkingDir, config.DefaultFileName), nil
 }
