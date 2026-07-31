@@ -33,7 +33,10 @@ func newEchoCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "echo",
 		Short: "Verify a DIMSE target with C-ECHO",
-		Args:  noArgs,
+		Long:  "Open a DIMSE Association and issue one C-ECHO request. C-ECHO verifies reachability and negotiation but does not modify remote data. Select --target or provide the connection overrides directly.",
+		Example: "  dicom-cli echo --target local-pacs\n" +
+			"  dicom-cli echo --host pacs.example.test --port 11112 --calling-ae DICOMCLI --called-ae PACS",
+		Args: noArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
 			target, err := loadDIMSETarget(command, runtime, root, options)
 			if err != nil {
@@ -62,7 +65,11 @@ func newSendCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "send <file-or-directory-or->",
 		Short: "Send DICOM instances with C-STORE",
-		Args:  cobra.ExactArgs(1),
+		Long:  "Send DICOM instances with C-STORE from one file, a directory, or newline-delimited paths on stdin. The command reuses Associations when possible and does not transcode source instances; transcode before sending when the target cannot accept the source transfer syntax.",
+		Example: "  dicom-cli send --target local-pacs image.dcm\n" +
+			"  dicom-cli send --target local-pacs --recursive study\n" +
+			"  Get-Content failed-paths.txt | dicom-cli send --target local-pacs -",
+		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			target, err := loadDIMSETarget(command, runtime, root, options)
 			if err != nil {

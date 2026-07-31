@@ -13,7 +13,11 @@ import (
 )
 
 func newConfigCommand(runtime Runtime, root *rootOptions) *cobra.Command {
-	command := &cobra.Command{Use: "config", Short: "Manage runtime configuration"}
+	command := &cobra.Command{
+		Use:   "config",
+		Short: "Manage runtime configuration",
+		Long:  "Create, validate, and maintain the runtime configuration used by DIMSE commands. Configuration discovery selects one file; it never merges multiple configuration files.",
+	}
 	command.AddCommand(newConfigInitCommand(runtime))
 	command.AddCommand(newConfigValidateCommand(runtime, root))
 	command.AddCommand(newConfigTargetCommand(runtime, root))
@@ -26,7 +30,10 @@ func newConfigInitCommand(runtime Runtime) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "init [path]",
 		Short: "Create a runtime configuration example",
-		Args:  cobra.MaximumNArgs(1),
+		Long:  "Create a YAML or JSON runtime configuration example. Existing files are never overwritten unless --force is supplied.",
+		Example: "  dicom-cli config init dicom-cli.yaml\n" +
+			"  dicom-cli config init dicom-cli.json --format json",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			path, err := initPath(runtime, args, format)
 			if err != nil {
@@ -55,7 +62,10 @@ func newConfigValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command
 	return &cobra.Command{
 		Use:   "validate [path]",
 		Short: "Validate a runtime configuration",
-		Args:  cobra.MaximumNArgs(1),
+		Long:  "Validate one runtime configuration file. When no path is provided, normal configuration discovery is used and built-in defaults are validated when no file is found.",
+		Example: "  dicom-cli config validate dicom-cli.yaml\n" +
+			"  dicom-cli config validate --config dicom-cli.yaml",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			options, err := loadOptions(runtime, root.configPath, args)
 			if err != nil {
@@ -72,7 +82,11 @@ func newConfigValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command
 }
 
 func newConfigTargetCommand(runtime Runtime, root *rootOptions) *cobra.Command {
-	command := &cobra.Command{Use: "target", Short: "Manage named PACS targets"}
+	command := &cobra.Command{
+		Use:   "target",
+		Short: "Manage named PACS targets",
+		Long:  "List and modify named PACS targets. Changes are made to the selected configuration file, which must already exist.",
+	}
 	command.AddCommand(newTargetListCommand(runtime, root))
 	command.AddCommand(newTargetAddCommand(runtime, root))
 	command.AddCommand(newTargetUpdateCommand(runtime, root))
@@ -84,6 +98,7 @@ func newTargetListCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List named PACS targets",
+		Long:  "List the named PACS targets in the selected configuration file. Output contains one name per line.",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			loaded, _, err := loadMutableConfig(runtime, root)
@@ -108,9 +123,11 @@ func newTargetListCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 func newTargetAddCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	values := targetFlagValues{}
 	command := &cobra.Command{
-		Use:   "add <name>",
-		Short: "Add a named PACS target",
-		Args:  cobra.ExactArgs(1),
+		Use:     "add <name>",
+		Short:   "Add a named PACS target",
+		Long:    "Add a named PACS target to the selected configuration file. This command requires all four connection fields: --host, --port, --calling-ae, and --called-ae.",
+		Example: "  dicom-cli config target add local-pacs --host pacs.example.test --port 11112 --calling-ae DICOMCLI --called-ae PACS",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			loaded, location, err := loadMutableConfig(runtime, root)
 			if err != nil {
@@ -136,9 +153,11 @@ func newTargetAddCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 func newTargetUpdateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	values := targetFlagValues{}
 	command := &cobra.Command{
-		Use:   "update <name>",
-		Short: "Update a named PACS target",
-		Args:  cobra.ExactArgs(1),
+		Use:     "update <name>",
+		Short:   "Update a named PACS target",
+		Long:    "Update an existing named PACS target. Only explicitly supplied fields are changed; omitted fields retain their configured values.",
+		Example: "  dicom-cli config target update local-pacs --host new-pacs.example.test",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			loaded, location, err := loadMutableConfig(runtime, root)
 			if err != nil {
@@ -161,9 +180,11 @@ func newTargetUpdateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 
 func newTargetRemoveCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Remove a named PACS target",
-		Args:  cobra.ExactArgs(1),
+		Use:     "remove <name>",
+		Short:   "Remove a named PACS target",
+		Long:    "This command removes the target from the selected configuration file. It fails when the target does not exist.",
+		Example: "  dicom-cli config target remove local-pacs",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			loaded, location, err := loadMutableConfig(runtime, root)
 			if err != nil {

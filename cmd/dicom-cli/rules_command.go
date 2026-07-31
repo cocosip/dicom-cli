@@ -12,7 +12,11 @@ import (
 )
 
 func newRulesCommand(runtime Runtime, root *rootOptions) *cobra.Command {
-	command := &cobra.Command{Use: "rules", Short: "Manage DICOM rules"}
+	command := &cobra.Command{
+		Use:   "rules",
+		Short: "Manage DICOM rules",
+		Long:  "Rule files provide named filters, inspection profiles, anonymization profiles, validation profiles, and DICOM templates.",
+	}
 	command.AddCommand(newRulesInitCommand(runtime))
 	command.AddCommand(newRulesValidateCommand(runtime, root))
 	return command
@@ -22,7 +26,12 @@ func newRulesInitCommand(runtime Runtime) *cobra.Command {
 	var format string
 	var force bool
 	command := &cobra.Command{
-		Use: "init [path]", Short: "Create a rules example", Args: cobra.MaximumNArgs(1),
+		Use:   "init [path]",
+		Short: "Create a rules example",
+		Long:  "Create a YAML or JSON rules example. Existing files are never overwritten unless --force is supplied.",
+		Example: "  dicom-cli rules init dicom-cli-rules.yaml\n" +
+			"  dicom-cli rules init dicom-cli-rules.json --format json",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			path, err := rulesInitPath(runtime, args, format)
 			if err != nil {
@@ -53,7 +62,11 @@ func newRulesInitCommand(runtime Runtime) *cobra.Command {
 
 func newRulesValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	return &cobra.Command{
-		Use: "validate [path]", Short: "Validate a rules file", Args: cobra.MaximumNArgs(1),
+		Use:     "validate [path]",
+		Short:   "Validate a rules file",
+		Long:    "Validate one rules file selected by its path or normal rules discovery. Unknown fields are rejected so misspelled rule names cannot be ignored.",
+		Example: "  dicom-cli rules validate dicom-cli-rules.yaml",
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			path, err := rulesPath(runtime, root.rulesPath, args)
 			if err != nil {

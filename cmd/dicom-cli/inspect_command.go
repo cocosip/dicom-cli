@@ -20,7 +20,12 @@ func newInspectCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	var asJSON bool
 	var destination string
 	command := &cobra.Command{
-		Use: "inspect <file>", Short: "Inspect a single DICOM file", Args: cobra.ExactArgs(1),
+		Use:   "inspect <file>",
+		Short: "Inspect a single DICOM file",
+		Long:  "Inspect one DICOM file and report patient, study, series, instance, and pixel metadata. Inspection never modifies the source file. Use --tag or --profile to select additional elements.",
+		Example: "  dicom-cli inspect image.dcm\n" +
+			"  dicom-cli inspect --tag PatientName --tag 0040,A730[0].0040,A160 image.dcm",
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if err := requireRegularFile(args[0]); err != nil {
 				return err

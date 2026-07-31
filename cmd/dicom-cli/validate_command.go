@@ -19,7 +19,12 @@ func newValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	var asJSON bool
 	var destination string
 	command := &cobra.Command{
-		Use: "validate <file>", Short: "Validate a single DICOM file", Args: cobra.ExactArgs(1),
+		Use:   "validate <file>",
+		Short: "Validate a single DICOM file",
+		Long:  "Validate one DICOM file and report all independent findings. Errors return the DICOM validation exit code; --strict also treats warnings as failures.",
+		Example: "  dicom-cli validate image.dcm\n" +
+			"  dicom-cli validate --strict --json --output validation.json image.dcm",
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if err := requireRegularFile(args[0]); err != nil {
 				return err

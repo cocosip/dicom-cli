@@ -17,7 +17,12 @@ func newEditCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	var destination, uidRoot, charset, inputCharset string
 	var remapUIDs bool
 	command := &cobra.Command{
-		Use: "edit <file>", Short: "Edit one DICOM file into a new file", Args: cobra.ExactArgs(1),
+		Use:   "edit <file>",
+		Short: "Edit one DICOM file into a new file",
+		Long:  "Apply tag edits to one DICOM file and always write a new output file. At least one edit operation is required. Private or unknown tags require --vr TagPath=VR when their VR cannot be inferred.",
+		Example: "  dicom-cli edit image.dcm --set PatientName=ANON^PATIENT --output edited.dcm\n" +
+			"  dicom-cli edit image.dcm --clear PatientID --output edited.dcm",
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if root.rulesPath != "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("edit does not accept a rules profile"))

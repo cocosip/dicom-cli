@@ -49,7 +49,10 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "anonymize <file-or-directory>",
 		Short: "Anonymize DICOM files into new files",
-		Args:  cobra.ExactArgs(1),
+		Long:  "Anonymize one DICOM file or a directory using the Basic Application Level Confidentiality Profile and optional rules. UID mappings are shared across the batch so related instances retain consistent replacement UIDs. Use --report only in a protected location because it can contain sensitive before-and-after values.",
+		Example: "  dicom-cli anonymize --output anonymized image.dcm\n" +
+			"  dicom-cli anonymize --profile research --rules dicom-cli-rules.yaml --recursive --output anonymized study",
+		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
 			selected, condition, err := loadAnonymizeProfile(runtime, root.rulesPath, profile, filter, command.Flags().Changed("profile") && root.rulesPath != "")
 			if err != nil {

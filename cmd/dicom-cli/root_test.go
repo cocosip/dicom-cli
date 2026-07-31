@@ -21,6 +21,52 @@ func TestExecuteHelpListsP0GlobalFlags(t *testing.T) {
 	}
 }
 
+func TestExecuteHelpExplainsEveryProjectCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "root", args: []string{"--help"}, want: "configuration, rules, file processing, and DIMSE"},
+		{name: "config", args: []string{"config", "--help"}, want: "Create, validate, and maintain"},
+		{name: "config init", args: []string{"config", "init", "--help"}, want: "Existing files are never overwritten"},
+		{name: "config validate", args: []string{"config", "validate", "--help"}, want: "built-in defaults are validated"},
+		{name: "config target", args: []string{"config", "target", "--help"}, want: "selected configuration file"},
+		{name: "config target list", args: []string{"config", "target", "list", "--help"}, want: "one name per line"},
+		{name: "config target add", args: []string{"config", "target", "add", "--help"}, want: "requires all four connection fields"},
+		{name: "config target update", args: []string{"config", "target", "update", "--help"}, want: "Only explicitly supplied fields"},
+		{name: "config target remove", args: []string{"config", "target", "remove", "--help"}, want: "removes the target from the selected configuration file"},
+		{name: "rules", args: []string{"rules", "--help"}, want: "Rule files provide named filters"},
+		{name: "rules init", args: []string{"rules", "init", "--help"}, want: "Existing files are never overwritten"},
+		{name: "rules validate", args: []string{"rules", "validate", "--help"}, want: "Unknown fields are rejected"},
+		{name: "inspect", args: []string{"inspect", "--help"}, want: "never modifies the source file"},
+		{name: "validate", args: []string{"validate", "--help"}, want: "all independent findings"},
+		{name: "edit", args: []string{"edit", "--help"}, want: "At least one edit operation is required"},
+		{name: "anonymize", args: []string{"anonymize", "--help"}, want: "UID mappings are shared across the batch"},
+		{name: "convert", args: []string{"convert", "--help"}, want: "DICOM input is exported"},
+		{name: "convert image", args: []string{"convert", "image", "--help"}, want: "Frame numbers start at 1"},
+		{name: "convert json", args: []string{"convert", "json", "--help"}, want: "PixelData is summarized by default"},
+		{name: "encapsulate", args: []string{"encapsulate", "--help"}, want: "External images are imported"},
+		{name: "encapsulate image", args: []string{"encapsulate", "image", "--help"}, want: "Study and Series UIDs are shared"},
+		{name: "transcode", args: []string{"transcode", "--help"}, want: "--to accepts a transfer syntax alias or standard UID"},
+		{name: "transcode formats", args: []string{"transcode", "formats", "--help"}, want: "registered in this binary"},
+		{name: "echo", args: []string{"echo", "--help"}, want: "does not modify remote data"},
+		{name: "send", args: []string{"send", "--help"}, want: "does not transcode source instances"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime, stdout, _ := testRuntime()
+			if code := Execute(tt.args, runtime); code != 0 {
+				t.Fatalf("Execute(%v) = %d, want 0", tt.args, code)
+			}
+			if !strings.Contains(stdout.String(), tt.want) {
+				t.Fatalf("help does not contain %q:\n%s", tt.want, stdout.String())
+			}
+		})
+	}
+}
+
 func TestExecuteAcceptsP0GlobalFlags(t *testing.T) {
 	tests := []struct {
 		name string

@@ -26,7 +26,8 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Short: "Re-encode DICOM transfer syntaxes",
 		Long: "Re-encode DICOM transfer syntaxes.\n\n" +
 			"--to accepts a transfer syntax alias or standard UID. Run " +
-			"`dicom-cli transcode formats` to list values available in this binary.",
+			"`dicom-cli transcode formats` to list values available in this binary. " +
+			"Both --to and --output are required, and the source file is never overwritten.",
 		Example: "  dicom-cli transcode formats\n" +
 			"  dicom-cli transcode --to rle --output compressed.dcm image.dcm\n" +
 			"  dicom-cli transcode --to 1.2.840.10008.1.2.1 --output output.dcm image.dcm",
@@ -112,7 +113,10 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	formats := &cobra.Command{
 		Use:   "formats",
 		Short: "List transfer syntaxes available in this binary",
-		Args:  noArgs,
+		Long:  "List transfer syntax aliases, UIDs, and encode/decode capabilities registered in this binary. Use an alias or UID from this output with transcode --to.",
+		Example: "  dicom-cli transcode formats\n" +
+			"  dicom-cli transcode formats --json",
+		Args: noArgs,
 		RunE: func(*cobra.Command, []string) error {
 			available := dicom.RuntimeCodecs()
 			if asJSON {

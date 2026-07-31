@@ -36,13 +36,17 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "convert",
 		Short: "Export DICOM images and metadata",
+		Long:  "DICOM input is exported either as rendered image frames or as metadata JSON. Select the image or json subcommand; conversion never rewrites the source DICOM file.",
 		Args:  noArgs,
 	}
 
 	imageCommand := &cobra.Command{
 		Use:   "image <input>",
 		Short: "Export DICOM pixel data as PNG or JPEG",
-		Args:  cobra.ExactArgs(1),
+		Long:  "Export DICOM pixel data as PNG or JPEG. Frame numbers start at 1; without --frame or --all-frames, the first frame is exported. Binary stdout requires exactly one result.",
+		Example: "  dicom-cli convert image --format png --output image.png image.dcm\n" +
+			"  dicom-cli convert image --all-frames --output frames image.dcm",
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return runDICOMExport(runtime, args[0], options)
 		},
@@ -56,9 +60,11 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	imageCommand.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
 
 	jsonCommand := &cobra.Command{
-		Use:   "json <input>",
-		Short: "Export DICOM metadata as JSON",
-		Args:  cobra.ExactArgs(1),
+		Use:     "json <input>",
+		Short:   "Export DICOM metadata as JSON",
+		Long:    "Export DICOM metadata as JSON. PixelData is summarized by default; use --include-pixel-data only when the full pixel bytes are required.",
+		Example: "  dicom-cli convert json --output metadata.json image.dcm",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			options.format = "json"
 			return runDICOMExport(runtime, args[0], options)

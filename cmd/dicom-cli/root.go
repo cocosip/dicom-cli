@@ -62,6 +62,7 @@ func NewRootCommand(runtime Runtime) *cobra.Command {
 	command := &cobra.Command{
 		Use:           "dicom-cli",
 		Short:         "DICOM command-line utility",
+		Long:          "dicom-cli provides configuration, rules, file processing, and DIMSE operations. Use a subcommand's --help output for its input, output, and safety constraints.",
 		Args:          noArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
