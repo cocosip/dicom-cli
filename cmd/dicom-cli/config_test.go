@@ -34,6 +34,11 @@ func TestConfigInitGeneratesAndValidatesYAMLAndJSON(t *testing.T) {
 			if !strings.HasPrefix(strings.TrimSpace(string(content)), tt.prefix) {
 				t.Fatalf("generated %s = %q, want prefix %q", tt.name, content, tt.prefix)
 			}
+			for _, want := range []string{"local-pacs", "pacs.example.test", "DICOMCLI", "PACS"} {
+				if !bytes.Contains(content, []byte(want)) {
+					t.Fatalf("generated %s does not contain starter target value %q: %s", tt.name, want, content)
+				}
+			}
 
 			runtime, _, stderr = testRuntime()
 			if code := Execute([]string{"config", "validate", tt.path}, runtime); code != 0 {

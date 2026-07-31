@@ -101,7 +101,7 @@ func Load(path string) (File, error) {
 
 // Example returns a valid starter rules document in the requested format.
 func Example(format string) ([]byte, error) {
-	file := File{Version: VersionV1, Filters: map[string]Condition{}, Inspect: InspectSection{Profiles: map[string]InspectProfile{}}, Anonymize: AnonymizeSection{Profiles: map[string]AnonymizeProfile{}}, ValidateRules: ValidateSection{Profiles: map[string]ValidateProfile{}}, DICOMTemplates: map[string]DICOMTemplate{}}
+	file := defaultExampleFile()
 	switch format {
 	case "yaml", "yml":
 		return yaml.Marshal(file)
@@ -113,6 +113,54 @@ func Example(format string) ([]byte, error) {
 		return append(content, '\n'), nil
 	default:
 		return nil, fmt.Errorf("unsupported rules format %q", format)
+	}
+}
+
+func defaultExampleFile() File {
+	ct := "CT"
+	patientName := "ANON^PATIENT"
+	studyDescription := "Converted image"
+	modality := "OT"
+	trueValue := true
+
+	return File{
+		Version: VersionV1,
+		Filters: map[string]Condition{
+			"ct-images": {All: []Condition{
+				{Path: "Modality", Equals: &ct},
+				{Path: "SOPInstanceUID", Exists: &trueValue},
+			}},
+		},
+		Inspect: InspectSection{Profiles: map[string]InspectProfile{
+			"summary": {Tags: []string{"PatientName", "PatientID", "StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID", "0040,A730[0].0040,A160"}},
+		}},
+		Anonymize: AnonymizeSection{Profiles: map[string]AnonymizeProfile{
+			"basic": {
+				Filter: "ct-images",
+				Rules: []AnonymizeRule{
+					{Path: "PatientName", Action: "replace", Value: &patientName},
+					{Path: "PatientID", Action: "clear"},
+					{Path: "AccessionNumber", Action: "delete"},
+					{Path: "StudyInstanceUID", Action: "remap_uid"},
+				},
+			},
+		}},
+		ValidateRules: ValidateSection{Profiles: map[string]ValidateProfile{
+			"ct-required-identifiers": {Rules: []ValidateRule{{
+				When:     Condition{Path: "Modality", Equals: &ct},
+				Assert:   Condition{Path: "StudyInstanceUID", Exists: &trueValue},
+				Severity: "error",
+				Message:  "CT instances must include StudyInstanceUID",
+			}}},
+		}},
+		DICOMTemplates: map[string]DICOMTemplate{
+			"secondary-capture": {Tags: map[string]string{
+				"PatientName":      patientName,
+				"PatientID":        "ANON",
+				"StudyDescription": studyDescription,
+				"Modality":         modality,
+			}},
+		},
 	}
 }
 

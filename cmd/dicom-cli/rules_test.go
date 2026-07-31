@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,6 +18,15 @@ func TestRulesInitGeneratesAndValidatesYAMLAndJSON(t *testing.T) {
 			}
 			if _, err := os.Stat(path); err != nil {
 				t.Fatal(err)
+			}
+			content, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range []string{"ct-images", "summary", "basic", "ct-required-identifiers", "secondary-capture"} {
+				if !bytes.Contains(content, []byte(want)) {
+					t.Fatalf("generated %s does not contain starter rule %q: %s", test.name, want, content)
+				}
 			}
 			runtime, _, stderr = testRuntime()
 			if code := Execute([]string{"rules", "validate", path}, runtime); code != 0 {

@@ -39,7 +39,7 @@ func newConfigInitCommand(runtime Runtime) *cobra.Command {
 					return apperr.Wrap(apperr.KindInput, err)
 				}
 			}
-			if err := config.Write(path, config.DefaultConfig(), format); err != nil {
+			if err := config.Write(path, config.DefaultExampleConfig(), format); err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
 			_, err = fmt.Fprintln(runtime.Stdout, path)

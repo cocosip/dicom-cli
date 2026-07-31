@@ -79,6 +79,30 @@ func DefaultConfig() Config {
 	}
 }
 
+// DefaultExampleConfig returns the complete starter document written by config init.
+// It intentionally differs from DefaultConfig so an absent configuration file does
+// not implicitly select the example PACS target.
+func DefaultExampleConfig() Config {
+	config := DefaultConfig()
+	config.Targets = map[string]PACSTarget{
+		"local-pacs": {
+			Host:           "pacs.example.test",
+			Port:           11112,
+			CallingAETitle: "DICOMCLI",
+			CalledAETitle:  "PACS",
+			Timeouts: Timeouts{
+				Connect:   15 * time.Second,
+				Associate: 45 * time.Second,
+				Idle:      5 * time.Minute,
+			},
+			TLS:   TLSConfig{},
+			Proxy: ProxyConfig{},
+			Auth:  AuthConfig{},
+		},
+	}
+	return config
+}
+
 // Validate checks values that can be verified without loading a configuration file.
 func (config Config) Validate() error {
 	var validationErrors []error
