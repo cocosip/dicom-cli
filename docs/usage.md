@@ -19,9 +19,10 @@
 进度写入 stderr；调用脚本应按此分流。
 
 帮助、文本结果、进度和本工具生成的诊断使用运行配置根字段 `language`：`en`
-为默认英文，`zh-CN` 为简体中文。语言随所选配置文件切换，`--config` 仍只负责
-选择配置文件；命令名、flag 名、JSON 字段和值、退出码、规则 DSL、DICOM Tag 和 UID
-不随语言变化。配置不存在、无法读取或 `language` 非法时，诊断以英文输出。
+为默认英文，`zh-CN` 为简体中文。使用 `lang <en|zh-CN>` 会写入所选且已存在的
+配置文件，后续使用该配置的命令自动切换语言；`--config` 仍只负责选择配置文件。命令名、flag 名、
+JSON 字段和值、退出码、规则 DSL、DICOM Tag 和 UID 不随语言变化。配置不存在、无法读取或
+`language` 非法时，诊断以英文输出。
 
 运行配置文件按 `--config`、`DICOM_CLI_CONFIG`、当前目录
 `dicom-cli.yaml`、用户配置目录 `dicom-cli.yaml`、内置默认值的顺序选择，
@@ -32,8 +33,9 @@
 ## 配置与规则
 
 `config init [path]` 生成 YAML 配置；加 `--format json` 生成 JSON，已有文件只有
-传 `--force` 才允许覆盖。`config validate [path]` 校验配置。目标维护命令需要已存在的
-配置文件；可通过 `--config` 或 `DICOM_CLI_CONFIG` 显式指定。
+传 `--force` 才允许覆盖。`config validate [path]` 校验配置。`lang <en|zh-CN>` 持久修改
+语言设置，`config language <en|zh-CN>` 保留为完整入口。语言和目标维护命令需要已存在的配置文件；可通过 `--config` 或
+`DICOM_CLI_CONFIG` 显式指定。
 
 命名 PACS 目标通过以下命令维护：
 

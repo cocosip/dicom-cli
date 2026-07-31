@@ -14,7 +14,9 @@ import (
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 )
 
-func newInspectCommand(runtime Runtime, root *rootOptions, localizer i18n.Localizer) *cobra.Command {
+func newInspectCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	localizer := root.localizer
+	text := localizer.Command("inspect")
 	var all bool
 	var tags []string
 	var profile string
@@ -22,8 +24,8 @@ func newInspectCommand(runtime Runtime, root *rootOptions, localizer i18n.Locali
 	var destination string
 	command := &cobra.Command{
 		Use:   "inspect <file>",
-		Short: localizer.Text(i18n.InspectShort),
-		Long:  localizer.Text(i18n.InspectLong),
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli inspect image.dcm\n" +
 			"  dicom-cli inspect --tag PatientName --tag 0040,A730[0].0040,A160 image.dcm",
 		Args: cobra.ExactArgs(1),

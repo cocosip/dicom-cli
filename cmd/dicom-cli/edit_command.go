@@ -13,13 +13,14 @@ import (
 )
 
 func newEditCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("edit")
 	var sets, clears, deletes, generates, vrs []string
 	var destination, uidRoot, charset, inputCharset string
 	var remapUIDs bool
 	command := &cobra.Command{
 		Use:   "edit <file>",
-		Short: "Edit one DICOM file into a new file",
-		Long:  "Apply tag edits to one DICOM file and always write a new output file. At least one edit operation is required. Private or unknown tags require --vr TagPath=VR when their VR cannot be inferred.",
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli edit image.dcm --set PatientName=ANON^PATIENT --output edited.dcm\n" +
 			"  dicom-cli edit image.dcm --clear PatientID --output edited.dcm",
 		Args: cobra.ExactArgs(1),
@@ -64,16 +65,17 @@ func newEditCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return err
 		},
 	}
-	command.Flags().StringArrayVar(&sets, "set", nil, "TagPath=value")
-	command.Flags().StringArrayVar(&clears, "clear", nil, "TagPath")
-	command.Flags().StringArrayVar(&deletes, "delete", nil, "TagPath")
-	command.Flags().StringArrayVar(&generates, "generate-uid", nil, "UID TagPath")
-	command.Flags().StringArrayVar(&vrs, "vr", nil, "TagPath=VR for private or unknown Tags")
-	command.Flags().StringVarP(&destination, "output", "o", "", "new DICOM output path")
-	command.Flags().StringVar(&uidRoot, "uid-root", "", "UID root for generated UIDs")
-	command.Flags().BoolVar(&remapUIDs, "remap-uids", false, "remap all UID values in the file")
-	command.Flags().StringVar(&charset, "charset", "", "output character set")
-	command.Flags().StringVar(&inputCharset, "input-charset", "", "override input character set")
+	localizedHelpFlag(command, root.localizer)
+	command.Flags().StringArrayVar(&sets, "set", nil, root.localizer.FlagUsage("set", "TagPath=value"))
+	command.Flags().StringArrayVar(&clears, "clear", nil, root.localizer.FlagUsage("clear", "TagPath"))
+	command.Flags().StringArrayVar(&deletes, "delete", nil, root.localizer.FlagUsage("delete", "TagPath"))
+	command.Flags().StringArrayVar(&generates, "generate-uid", nil, root.localizer.FlagUsage("generate-uid", "UID TagPath"))
+	command.Flags().StringArrayVar(&vrs, "vr", nil, root.localizer.FlagUsage("vr", "TagPath=VR for private or unknown Tags"))
+	command.Flags().StringVarP(&destination, "output", "o", "", root.localizer.FlagUsage("output", "new DICOM output path"))
+	command.Flags().StringVar(&uidRoot, "uid-root", "", root.localizer.FlagUsage("uid-root", "UID root for generated UIDs"))
+	command.Flags().BoolVar(&remapUIDs, "remap-uids", false, root.localizer.FlagUsage("remap-uids", "remap all UID values in the file"))
+	command.Flags().StringVar(&charset, "charset", "", root.localizer.FlagUsage("charset", "output character set"))
+	command.Flags().StringVar(&inputCharset, "input-charset", "", root.localizer.FlagUsage("input-charset", "override input character set"))
 	return command
 }
 

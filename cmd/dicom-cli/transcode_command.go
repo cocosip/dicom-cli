@@ -19,15 +19,13 @@ import (
 )
 
 func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("transcode")
 	var target, destination, filterName string
 	var recursive, failFast, flatten bool
 	command := &cobra.Command{
 		Use:   "transcode <file>",
-		Short: "Re-encode DICOM transfer syntaxes",
-		Long: "Re-encode DICOM transfer syntaxes.\n\n" +
-			"--to accepts a transfer syntax alias or standard UID. Run " +
-			"`dicom-cli transcode formats` to list values available in this binary. " +
-			"Both --to and --output are required, and the source file is never overwritten.",
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli transcode formats\n" +
 			"  dicom-cli transcode --to rle --output compressed.dcm image.dcm\n" +
 			"  dicom-cli transcode --to 1.2.840.10008.1.2.1 --output output.dcm image.dcm",
@@ -103,17 +101,18 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return nil
 		},
 	}
-	command.Flags().StringVar(&target, "to", "", "target transfer syntax alias or UID; run 'transcode formats' to list values")
-	command.Flags().StringVarP(&destination, "output", "o", "", "output DICOM file")
-	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
-	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")
-	command.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure")
-	command.Flags().StringVar(&filterName, "filter", "", "named rules filter for directory input")
+	command.Flags().StringVar(&target, "to", "", root.localizer.FlagUsage("to", "target transfer syntax alias or UID; run 'transcode formats' to list values"))
+	command.Flags().StringVarP(&destination, "output", "o", "", root.localizer.FlagUsage("output", "output DICOM file"))
+	command.Flags().BoolVarP(&recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+	command.Flags().BoolVar(&failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+	command.Flags().BoolVar(&flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
+	command.Flags().StringVar(&filterName, "filter", "", root.localizer.FlagUsage("filter", "named rules filter for directory input"))
 	var asJSON bool
+	formatsText := root.localizer.Command("transcode formats")
 	formats := &cobra.Command{
 		Use:   "formats",
-		Short: "List transfer syntaxes available in this binary",
-		Long:  "List transfer syntax aliases, UIDs, and encode/decode capabilities registered in this binary. Use an alias or UID from this output with transcode --to.",
+		Short: formatsText.Short,
+		Long:  formatsText.Long,
 		Example: "  dicom-cli transcode formats\n" +
 			"  dicom-cli transcode formats --json",
 		Args: noArgs,
@@ -134,7 +133,9 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return nil
 		},
 	}
-	formats.Flags().BoolVarP(&asJSON, "json", "j", false, "write JSON output")
+	formats.Flags().BoolVarP(&asJSON, "json", "j", false, root.localizer.FlagUsage("json", "write JSON output"))
+	localizedHelpFlag(command, root.localizer)
+	localizedHelpFlag(formats, root.localizer)
 	command.AddCommand(formats)
 	return command
 }

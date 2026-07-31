@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	"github.com/cocosip/dicom-cli/internal/config"
@@ -97,9 +96,10 @@ func NewRootCommand(runtime Runtime, localizer i18n.Localizer) *cobra.Command {
 	flags.BoolVarP(&options.verbose, "verbose", "v", false, localizer.Text(i18n.FlagVerbose))
 	flags.BoolVarP(&options.quiet, "quiet", "q", false, localizer.Text(i18n.FlagQuiet))
 	flags.StringVar(&options.logFormat, "log-format", "text", localizer.Text(i18n.FlagLogFormat))
+	command.AddCommand(newLanguageCommand(runtime, &options))
 	command.AddCommand(newConfigCommand(runtime, &options))
 	command.AddCommand(newRulesCommand(runtime, &options))
-	command.AddCommand(newInspectCommand(runtime, &options, localizer))
+	command.AddCommand(newInspectCommand(runtime, &options))
 	command.AddCommand(newValidateCommand(runtime, &options))
 	command.AddCommand(newAnonymizeCommand(runtime, &options))
 	command.AddCommand(newEditCommand(runtime, &options))
@@ -108,8 +108,27 @@ func NewRootCommand(runtime Runtime, localizer i18n.Localizer) *cobra.Command {
 	command.AddCommand(newTranscodeCommand(runtime, &options))
 	command.AddCommand(newEchoCommand(runtime, &options))
 	command.AddCommand(newSendCommand(runtime, &options))
-	localizeCommandTree(command, localizer)
+	return command
+}
 
+func newLanguageCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("lang")
+	command := &cobra.Command{
+		Use:     "lang <en|zh-CN>",
+		Aliases: []string{"language"},
+		Short:   text.Short,
+		Long:    text.Long,
+		Example: "  dicom-cli lang zh-CN\n  dicom-cli -c dicom-cli.yaml lang en",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if err := setConfiguredLanguage(runtime, root, args[0]); err != nil {
+				return err
+			}
+			_, err := fmt.Fprintf(runtime.Stdout, "language=%s\n", args[0])
+			return err
+		},
+	}
+	localizedHelpFlag(command, root.localizer)
 	return command
 }
 
@@ -187,25 +206,6 @@ func localizedHelpFlag(command *cobra.Command, localizer i18n.Localizer) {
 		return
 	}
 	command.Flags().BoolP("help", "h", false, localizer.Text(i18n.FlagHelp))
-}
-
-func localizeCommandTree(root *cobra.Command, localizer i18n.Localizer) {
-	if !localizer.IsChineseSimplified() {
-		return
-	}
-	var visit func(*cobra.Command)
-	visit = func(command *cobra.Command) {
-		localizedHelpFlag(command, localizer)
-		command.Short = localizer.CommandShort(command.CommandPath(), command.Short)
-		command.Long = localizer.CommandLong(command.CommandPath(), command.Long)
-		command.Flags().VisitAll(func(flag *pflag.Flag) {
-			flag.Usage = localizer.FlagUsage(flag.Name, flag.Usage)
-		})
-		for _, child := range command.Commands() {
-			visit(child)
-		}
-	}
-	visit(root)
 }
 
 func noArgs(_ *cobra.Command, args []string) error {

@@ -8,27 +8,31 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/dicom-cli/internal/rules"
 )
 
 func newRulesCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("rules")
 	command := &cobra.Command{
 		Use:   "rules",
-		Short: "Manage DICOM rules",
-		Long:  "Rule files provide named filters, inspection profiles, anonymization profiles, validation profiles, and DICOM templates.",
+		Short: text.Short,
+		Long:  text.Long,
 	}
-	command.AddCommand(newRulesInitCommand(runtime))
+	localizedHelpFlag(command, root.localizer)
+	command.AddCommand(newRulesInitCommand(runtime, root))
 	command.AddCommand(newRulesValidateCommand(runtime, root))
 	return command
 }
 
-func newRulesInitCommand(runtime Runtime) *cobra.Command {
+func newRulesInitCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("rules init")
 	var format string
 	var force bool
 	command := &cobra.Command{
 		Use:   "init [path]",
-		Short: "Create a rules example",
-		Long:  "Create a YAML or JSON rules example. Existing files are never overwritten unless --force is supplied.",
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli rules init dicom-cli-rules.yaml\n" +
 			"  dicom-cli rules init dicom-cli-rules.json --format json",
 		Args: cobra.MaximumNArgs(1),
@@ -55,16 +59,18 @@ func newRulesInitCommand(runtime Runtime) *cobra.Command {
 			return err
 		},
 	}
-	command.Flags().StringVar(&format, "format", "yaml", "rules format: yaml or json")
-	command.Flags().BoolVar(&force, "force", false, "overwrite an existing file")
+	localizedHelpFlag(command, root.localizer)
+	command.Flags().StringVar(&format, "format", "yaml", root.localizer.FlagUsage("format", "rules format: yaml or json"))
+	command.Flags().BoolVar(&force, "force", false, root.localizer.FlagUsage("force", "overwrite an existing file"))
 	return command
 }
 
 func newRulesValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
-	return &cobra.Command{
+	text := root.localizer.Command("rules validate")
+	command := &cobra.Command{
 		Use:     "validate [path]",
-		Short:   "Validate a rules file",
-		Long:    "Validate one rules file selected by its path or normal rules discovery. Unknown fields are rejected so misspelled rule names cannot be ignored.",
+		Short:   text.Short,
+		Long:    text.Long,
 		Example: "  dicom-cli rules validate dicom-cli-rules.yaml",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -75,10 +81,12 @@ func newRulesValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command 
 			if _, err := rules.Load(path); err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
-			_, err = fmt.Fprintln(runtime.Stdout, "valid")
+			_, err = fmt.Fprintln(runtime.Stdout, root.localizer.Text(i18n.ValidationValid))
 			return err
 		},
 	}
+	localizedHelpFlag(command, root.localizer)
+	return command
 }
 
 func rulesInitPath(runtime Runtime, args []string, format string) (string, error) {

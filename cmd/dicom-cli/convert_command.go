@@ -32,18 +32,20 @@ type dicomExportOptions struct {
 }
 
 func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("convert")
 	options := dicomExportOptions{format: "png"}
 	command := &cobra.Command{
 		Use:   "convert",
-		Short: "Export DICOM images and metadata",
-		Long:  "DICOM input is exported either as rendered image frames or as metadata JSON. Select the image or json subcommand; conversion never rewrites the source DICOM file.",
+		Short: text.Short,
+		Long:  text.Long,
 		Args:  noArgs,
 	}
 
+	imageText := root.localizer.Command("convert image")
 	imageCommand := &cobra.Command{
 		Use:   "image <input>",
-		Short: "Export DICOM pixel data as PNG or JPEG",
-		Long:  "Export DICOM pixel data as PNG or JPEG. Frame numbers start at 1; without --frame or --all-frames, the first frame is exported. Binary stdout requires exactly one result.",
+		Short: imageText.Short,
+		Long:  imageText.Long,
 		Example: "  dicom-cli convert image --format png --output image.png image.dcm\n" +
 			"  dicom-cli convert image --all-frames --output frames image.dcm",
 		Args: cobra.ExactArgs(1),
@@ -51,18 +53,19 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return runDICOMExport(runtime, args[0], options)
 		},
 	}
-	imageCommand.Flags().StringVar(&options.format, "format", "png", "output format: png or jpeg")
-	imageCommand.Flags().StringVarP(&options.destination, "output", "o", "", "output file, directory, or -")
-	imageCommand.Flags().IntVar(&options.frame, "frame", 0, "one-based frame number")
-	imageCommand.Flags().BoolVar(&options.allFrames, "all-frames", false, "export every image frame")
-	imageCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, "scan subdirectories")
-	imageCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, "stop after the first file failure")
-	imageCommand.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
+	imageCommand.Flags().StringVar(&options.format, "format", "png", root.localizer.FlagUsage("format", "output format: png or jpeg"))
+	imageCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file, directory, or -"))
+	imageCommand.Flags().IntVar(&options.frame, "frame", 0, root.localizer.FlagUsage("frame", "one-based frame number"))
+	imageCommand.Flags().BoolVar(&options.allFrames, "all-frames", false, root.localizer.FlagUsage("all-frames", "export every image frame"))
+	imageCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+	imageCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+	imageCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
 
+	jsonText := root.localizer.Command("convert json")
 	jsonCommand := &cobra.Command{
 		Use:     "json <input>",
-		Short:   "Export DICOM metadata as JSON",
-		Long:    "Export DICOM metadata as JSON. PixelData is summarized by default; use --include-pixel-data only when the full pixel bytes are required.",
+		Short:   jsonText.Short,
+		Long:    jsonText.Long,
 		Example: "  dicom-cli convert json --output metadata.json image.dcm",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -70,12 +73,15 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return runDICOMExport(runtime, args[0], options)
 		},
 	}
-	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", "output file or -")
-	jsonCommand.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, "include PixelData bytes")
-	jsonCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, "scan subdirectories")
-	jsonCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, "stop after the first file failure")
-	jsonCommand.Flags().BoolVar(&options.flatten, "flatten", false, "do not preserve input directory structure")
+	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
+	jsonCommand.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, root.localizer.FlagUsage("include-pixel-data", "include PixelData bytes"))
+	jsonCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+	jsonCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+	jsonCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
 
+	localizedHelpFlag(command, root.localizer)
+	localizedHelpFlag(imageCommand, root.localizer)
+	localizedHelpFlag(jsonCommand, root.localizer)
 	command.AddCommand(imageCommand, jsonCommand)
 	return command
 }

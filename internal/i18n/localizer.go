@@ -14,8 +14,17 @@ const (
 // Key identifies a localized message.
 type Key string
 
+// CommandText contains the human-readable text shown for one command.
+// Command names, positional arguments, flags, and examples remain stable CLI
+// contracts and deliberately do not belong in the translated text.
+type CommandText struct {
+	Short string
+	Long  string
+}
+
 const (
 	ConfigValid           Key = "config.valid"
+	ValidationValid       Key = "validation.valid"
 	EchoSucceeded         Key = "echo.succeeded"
 	RootShort             Key = "root.short"
 	RootLong              Key = "root.long"
@@ -62,26 +71,15 @@ func (localizer Localizer) IsChineseSimplified() bool {
 	return localizer.language == ChineseSimplified
 }
 
-// CommandShort returns the localized short description for a command path.
-func (localizer Localizer) CommandShort(path, fallback string) string {
-	if !localizer.IsChineseSimplified() {
-		return fallback
+// Command returns the catalog entry for a command relative to dicom-cli, such
+// as "config" or "config target add". Missing entries are intentionally empty
+// so new commands cannot silently retain an English description in Chinese help.
+func (localizer Localizer) Command(name string) CommandText {
+	path := "dicom-cli " + name
+	if localizer.IsChineseSimplified() {
+		return CommandText{Short: chineseCommandShort[path], Long: chineseCommandLong[path]}
 	}
-	if translated, ok := chineseCommandShort[path]; ok {
-		return translated
-	}
-	return fallback
-}
-
-// CommandLong returns the localized detailed description for a command path.
-func (localizer Localizer) CommandLong(path, fallback string) string {
-	if !localizer.IsChineseSimplified() {
-		return fallback
-	}
-	if translated, ok := chineseCommandLong[path]; ok {
-		return translated
-	}
-	return fallback
+	return englishCommands[path]
 }
 
 // FlagUsage returns the localized usage description for common CLI flags.
@@ -161,6 +159,7 @@ func (localizer Localizer) ProgressFailed(path string, err error) string {
 
 var english = map[Key]string{
 	ConfigValid:           "Configuration is valid",
+	ValidationValid:       "valid",
 	EchoSucceeded:         "C-ECHO succeeded: %s:%d",
 	RootShort:             "DICOM command-line utility",
 	RootLong:              "dicom-cli provides configuration, rules, file processing, and DIMSE operations. Use a subcommand's --help output for its input, output, and safety constraints.",
@@ -189,6 +188,7 @@ var english = map[Key]string{
 
 var chineseSimplified = map[Key]string{
 	ConfigValid:           "配置有效",
+	ValidationValid:       "有效",
 	EchoSucceeded:         "C-ECHO 成功：%s:%d",
 	RootShort:             "DICOM 命令行工具",
 	RootLong:              "dicom-cli 提供配置、规则、文件处理和 DIMSE 操作。使用子命令的 --help 查看输入、输出和安全限制。",
@@ -215,10 +215,41 @@ var chineseSimplified = map[Key]string{
 	FlagReportOutput:      "报告输出路径",
 }
 
+var englishCommands = map[string]CommandText{
+	"dicom-cli config":               {Short: "Manage runtime configuration", Long: "Create, validate, and maintain the runtime configuration used by DIMSE commands. Configuration discovery selects one file; it never merges multiple configuration files."},
+	"dicom-cli lang":                 {Short: "Set the persistent CLI language", Long: "Set the language in the selected existing configuration file. Subsequent commands that use this configuration display human-readable output in the selected language."},
+	"dicom-cli config init":          {Short: "Create a runtime configuration example", Long: "Create a YAML or JSON runtime configuration example. Existing files are never overwritten unless --force is supplied."},
+	"dicom-cli config language":      {Short: "Set the persistent CLI language", Long: "Set the language in the selected existing configuration file. Subsequent commands that use this configuration display human-readable output in the selected language."},
+	"dicom-cli config validate":      {Short: "Validate a runtime configuration", Long: "Validate one runtime configuration file. When no path is provided, normal configuration discovery is used and built-in defaults are validated when no file is found."},
+	"dicom-cli config target":        {Short: "Manage named PACS targets", Long: "List and modify named PACS targets. Changes are made to the selected configuration file, which must already exist."},
+	"dicom-cli config target list":   {Short: "List named PACS targets", Long: "List the named PACS targets in the selected configuration file. Output contains one name per line."},
+	"dicom-cli config target add":    {Short: "Add a named PACS target", Long: "Add a named PACS target to the selected configuration file. This command requires all four connection fields: --host, --port, --calling-ae, and --called-ae."},
+	"dicom-cli config target update": {Short: "Update a named PACS target", Long: "Update an existing named PACS target. Only explicitly supplied fields are changed; omitted fields retain their configured values."},
+	"dicom-cli config target remove": {Short: "Remove a named PACS target", Long: "This command removes the target from the selected configuration file. It fails when the target does not exist."},
+	"dicom-cli rules":                {Short: "Manage DICOM rules", Long: "Rule files provide named filters, inspection profiles, anonymization profiles, validation profiles, and DICOM templates."},
+	"dicom-cli rules init":           {Short: "Create a rules example", Long: "Create a YAML or JSON rules example. Existing files are never overwritten unless --force is supplied."},
+	"dicom-cli rules validate":       {Short: "Validate a rules file", Long: "Validate one rules file selected by its path or normal rules discovery. Unknown fields are rejected so misspelled rule names cannot be ignored."},
+	"dicom-cli inspect":              {Short: "Inspect a single DICOM file", Long: "Inspect one DICOM file and report patient, study, series, instance, and pixel metadata. Inspection never modifies the source file. Use --tag or --profile to select additional elements."},
+	"dicom-cli validate":             {Short: "Validate a single DICOM file", Long: "Validate one DICOM file and report all independent findings. Errors return the DICOM validation exit code; --strict also treats warnings as failures."},
+	"dicom-cli edit":                 {Short: "Edit one DICOM file into a new file", Long: "Apply tag edits to one DICOM file and always write a new output file. At least one edit operation is required. Private or unknown tags require --vr TagPath=VR when their VR cannot be inferred."},
+	"dicom-cli anonymize":            {Short: "Anonymize DICOM files into new files", Long: "Anonymize one DICOM file or a directory using the Basic Application Level Confidentiality Profile and optional rules. UID mappings are shared across the batch so related instances retain consistent replacement UIDs. Use --report only in a protected location because it can contain sensitive before-and-after values."},
+	"dicom-cli convert":              {Short: "Export DICOM images and metadata", Long: "DICOM input is exported either as rendered image frames or as metadata JSON. Select the image or json subcommand; conversion never rewrites the source DICOM file."},
+	"dicom-cli convert image":        {Short: "Export DICOM pixel data as PNG or JPEG", Long: "Export DICOM pixel data as PNG or JPEG. Frame numbers start at 1; without --frame or --all-frames, the first frame is exported. Binary stdout requires exactly one result."},
+	"dicom-cli convert json":         {Short: "Export DICOM metadata as JSON", Long: "Export DICOM metadata as JSON. PixelData is summarized by default; use --include-pixel-data only when the full pixel bytes are required."},
+	"dicom-cli encapsulate":          {Short: "Encapsulate external content as DICOM", Long: "External images are imported into uncompressed Secondary Capture DICOM files. Select the image subcommand to provide metadata and output handling."},
+	"dicom-cli encapsulate image":    {Short: "Encapsulate PNG or JPEG images as Secondary Capture DICOM", Long: "Encapsulate supported PNG or JPEG images as uncompressed Explicit VR Little Endian Secondary Capture DICOM. PatientName must come from --patient-name, --template, or --reference. For directory input, Study and Series UIDs are shared while each image receives a distinct SOP Instance UID."},
+	"dicom-cli transcode":            {Short: "Re-encode DICOM transfer syntaxes", Long: "Re-encode DICOM transfer syntaxes.\n\n--to accepts a transfer syntax alias or standard UID. Run `dicom-cli transcode formats` to list values available in this binary. Both --to and --output are required, and the source file is never overwritten."},
+	"dicom-cli transcode formats":    {Short: "List transfer syntaxes available in this binary", Long: "List transfer syntax aliases, UIDs, and encode/decode capabilities registered in this binary. Use an alias or UID from this output with transcode --to."},
+	"dicom-cli echo":                 {Short: "Verify a DIMSE target with C-ECHO", Long: "Open a DIMSE Association and issue one C-ECHO request. C-ECHO verifies reachability and negotiation but does not modify remote data. Select --target or provide the connection overrides directly."},
+	"dicom-cli send":                 {Short: "Send DICOM instances with C-STORE", Long: "Send DICOM instances with C-STORE from one file, a directory, or newline-delimited paths on stdin. The command reuses Associations when possible and does not transcode source instances; transcode before sending when the target cannot accept the source transfer syntax."},
+}
+
 var chineseCommandShort = map[string]string{
 	"dicom-cli anonymize":            "将 DICOM 文件脱敏后写入新文件",
 	"dicom-cli config":               "管理运行配置",
+	"dicom-cli lang":                 "设置持久 CLI 语言",
 	"dicom-cli config init":          "创建运行配置示例",
+	"dicom-cli config language":      "设置持久 CLI 语言",
 	"dicom-cli config validate":      "校验运行配置",
 	"dicom-cli config target":        "管理命名 PACS 目标",
 	"dicom-cli config target list":   "列出命名 PACS 目标",
@@ -244,7 +275,9 @@ var chineseCommandShort = map[string]string{
 
 var chineseCommandLong = map[string]string{
 	"dicom-cli config":               "创建、校验和维护 DIMSE 命令使用的运行配置。配置发现只选择一个文件，不会合并多个配置文件。",
+	"dicom-cli lang":                 "在所选且已存在的配置文件中设置语言。后续使用该配置的命令会以所选语言显示面向用户的输出。",
 	"dicom-cli config init":          "创建 YAML 或 JSON 运行配置示例。除非提供 --force，否则绝不覆盖已有文件。",
+	"dicom-cli config language":      "在所选且已存在的配置文件中设置语言。后续使用该配置的命令会以所选语言显示面向用户的输出。",
 	"dicom-cli config validate":      "校验一个运行配置文件。未提供路径时使用常规配置发现；未找到文件时校验内置默认值。",
 	"dicom-cli config target":        "列出和修改命名 PACS 目标。修改写入所选配置文件，该文件必须已存在。",
 	"dicom-cli config target list":   "列出所选配置文件中的命名 PACS 目标，每行一个名称。",
@@ -284,6 +317,7 @@ var chineseFlagUsage = map[string]string{
 	"failed-list":        "将失败路径写为每行一个的列表",
 	"filter":             "目录输入使用的命名规则筛选器",
 	"flatten":            "不保留输入目录结构",
+	"force":              "覆盖已有文件",
 	"format":             "输出格式",
 	"frame":              "从 1 开始的帧号",
 	"generate-uid":       "UID TagPath",

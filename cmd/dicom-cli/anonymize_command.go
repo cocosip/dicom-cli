@@ -44,13 +44,14 @@ type anonymizeFileReport struct {
 }
 
 func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("anonymize")
 	var profile, destination, reportPath, filter string
 	var profileOptions []string
 	var recursive, failFast, flatten, asJSON bool
 	command := &cobra.Command{
 		Use:   "anonymize <file-or-directory>",
-		Short: "Anonymize DICOM files into new files",
-		Long:  "Anonymize one DICOM file or a directory using the Basic Application Level Confidentiality Profile and optional rules. UID mappings are shared across the batch so related instances retain consistent replacement UIDs. Use --report only in a protected location because it can contain sensitive before-and-after values.",
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli anonymize --output anonymized image.dcm\n" +
 			"  dicom-cli anonymize --profile research --rules dicom-cli-rules.yaml --recursive --output anonymized study",
 		Args: cobra.ExactArgs(1),
@@ -160,15 +161,16 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return nil
 		},
 	}
-	command.Flags().StringVarP(&profile, "profile", "p", "basic", "rules anonymize profile; defaults to built-in basic")
-	command.Flags().StringArrayVar(&profileOptions, "option", nil, "standard anonymize profile option")
-	command.Flags().StringVar(&filter, "filter", "", "named rules filter")
-	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
-	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")
-	command.Flags().BoolVar(&flatten, "flatten", false, "do not preserve input directory structure")
-	command.Flags().StringVarP(&destination, "output", "o", "", "DICOM output directory or - for one file")
-	command.Flags().BoolVarP(&asJSON, "json", "j", false, "write JSON summary")
-	command.Flags().StringVar(&reportPath, "report", "", "write detailed sensitive report to file")
+	localizedHelpFlag(command, root.localizer)
+	command.Flags().StringVarP(&profile, "profile", "p", "basic", root.localizer.FlagUsage("profile", "rules anonymize profile; defaults to built-in basic"))
+	command.Flags().StringArrayVar(&profileOptions, "option", nil, root.localizer.FlagUsage("option", "standard anonymize profile option"))
+	command.Flags().StringVar(&filter, "filter", "", root.localizer.FlagUsage("filter", "named rules filter"))
+	command.Flags().BoolVarP(&recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+	command.Flags().BoolVar(&failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+	command.Flags().BoolVar(&flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
+	command.Flags().StringVarP(&destination, "output", "o", "", root.localizer.FlagUsage("output", "DICOM output directory or - for one file"))
+	command.Flags().BoolVarP(&asJSON, "json", "j", false, root.localizer.FlagUsage("json", "write JSON summary"))
+	command.Flags().StringVar(&reportPath, "report", "", root.localizer.FlagUsage("report", "write detailed sensitive report to file"))
 	return command
 }
 

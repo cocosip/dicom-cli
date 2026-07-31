@@ -8,20 +8,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
+	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/dicom-cli/internal/rules"
 	validatepkg "github.com/cocosip/dicom-cli/internal/validate"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 )
 
 func newValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("validate")
 	var profile string
 	var strict bool
 	var asJSON bool
 	var destination string
 	command := &cobra.Command{
 		Use:   "validate <file>",
-		Short: "Validate a single DICOM file",
-		Long:  "Validate one DICOM file and report all independent findings. Errors return the DICOM validation exit code; --strict also treats warnings as failures.",
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli validate image.dcm\n" +
 			"  dicom-cli validate --strict --json --output validation.json image.dcm",
 		Args: cobra.ExactArgs(1),
@@ -50,7 +52,7 @@ func newValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
 			result := validatepkg.Validate(parsed, profiles...)
-			content, err := renderValidate(result, asJSON)
+			content, err := renderValidate(result, asJSON, root.localizer)
 			if err != nil {
 				return err
 			}
@@ -60,19 +62,20 @@ func newValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return result.Failure(strict)
 		},
 	}
-	command.Flags().StringVarP(&profile, "profile", "p", "", "validate profile from rules")
-	command.Flags().BoolVar(&strict, "strict", false, "treat warnings as failures")
-	command.Flags().BoolVarP(&asJSON, "json", "j", false, "write JSON")
-	command.Flags().StringVarP(&destination, "output", "o", "", "report output path")
+	localizedHelpFlag(command, root.localizer)
+	command.Flags().StringVarP(&profile, "profile", "p", "", root.localizer.FlagUsage("profile", "validate profile from rules"))
+	command.Flags().BoolVar(&strict, "strict", false, root.localizer.FlagUsage("strict", "treat warnings as failures"))
+	command.Flags().BoolVarP(&asJSON, "json", "j", false, root.localizer.FlagUsage("json", "write JSON"))
+	command.Flags().StringVarP(&destination, "output", "o", "", root.localizer.FlagUsage("output", "report output path"))
 	return command
 }
 
-func renderValidate(result validatepkg.Result, asJSON bool) ([]byte, error) {
+func renderValidate(result validatepkg.Result, asJSON bool, localizer i18n.Localizer) ([]byte, error) {
 	if asJSON {
 		return json.MarshalIndent(result, "", "  ")
 	}
 	if len(result.Issues) == 0 {
-		return []byte("valid\n"), nil
+		return []byte(localizer.Text(i18n.ValidationValid) + "\n"), nil
 	}
 	lines := make([]string, 0, len(result.Issues))
 	for _, issue := range result.Issues {

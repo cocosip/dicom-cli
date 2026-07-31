@@ -29,12 +29,13 @@ type dimseOptions struct {
 }
 
 func newEchoCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("echo")
 	options := dimseOptions{}
 	var asJSON bool
 	command := &cobra.Command{
 		Use:   "echo",
-		Short: "Verify a DIMSE target with C-ECHO",
-		Long:  "Open a DIMSE Association and issue one C-ECHO request. C-ECHO verifies reachability and negotiation but does not modify remote data. Select --target or provide the connection overrides directly.",
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli echo --target local-pacs\n" +
 			"  dicom-cli echo --host pacs.example.test --port 11112 --calling-ae DICOMCLI --called-ae PACS",
 		Args: noArgs,
@@ -53,20 +54,22 @@ func newEchoCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return err
 		},
 	}
-	bindDIMSEFlags(command, &options)
-	command.Flags().BoolVarP(&asJSON, "json", "j", false, "write JSON result")
+	localizedHelpFlag(command, root.localizer)
+	bindDIMSEFlags(command, &options, root.localizer)
+	command.Flags().BoolVarP(&asJSON, "json", "j", false, root.localizer.FlagUsage("json", "write JSON result"))
 	return command
 }
 
 func newSendCommand(runtime Runtime, root *rootOptions) *cobra.Command {
+	text := root.localizer.Command("send")
 	options := dimseOptions{}
 	var recursive, failFast, asJSON bool
 	var filter, reportPath, failedListPath string
 	var maxInstances, concurrency, retries int
 	command := &cobra.Command{
 		Use:   "send <file-or-directory-or->",
-		Short: "Send DICOM instances with C-STORE",
-		Long:  "Send DICOM instances with C-STORE from one file, a directory, or newline-delimited paths on stdin. The command reuses Associations when possible and does not transcode source instances; transcode before sending when the target cannot accept the source transfer syntax.",
+		Short: text.Short,
+		Long:  text.Long,
 		Example: "  dicom-cli send --target local-pacs image.dcm\n" +
 			"  dicom-cli send --target local-pacs --recursive study\n" +
 			"  Get-Content failed-paths.txt | dicom-cli send --target local-pacs -",
@@ -117,29 +120,30 @@ func newSendCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return nil
 		},
 	}
-	bindDIMSEFlags(command, &options)
-	command.Flags().BoolVarP(&recursive, "recursive", "r", false, "scan subdirectories")
-	command.Flags().BoolVar(&failFast, "fail-fast", false, "stop after the first file failure")
-	command.Flags().StringVar(&filter, "filter", "", "named rules filter for directory input")
-	command.Flags().IntVar(&maxInstances, "max-instances", 0, "maximum instances per Association (0 is unlimited)")
-	command.Flags().IntVar(&concurrency, "concurrency", 1, "maximum concurrent Associations")
-	command.Flags().IntVar(&retries, "retries", 1, "retries for network and timeout failures")
-	command.Flags().StringVar(&reportPath, "report", "", "write detailed JSON report")
-	command.Flags().StringVar(&failedListPath, "failed-list", "", "write failed paths as a newline-delimited list")
-	command.Flags().BoolVarP(&asJSON, "json", "j", false, "write JSON summary")
+	localizedHelpFlag(command, root.localizer)
+	bindDIMSEFlags(command, &options, root.localizer)
+	command.Flags().BoolVarP(&recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+	command.Flags().BoolVar(&failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+	command.Flags().StringVar(&filter, "filter", "", root.localizer.FlagUsage("filter", "named rules filter for directory input"))
+	command.Flags().IntVar(&maxInstances, "max-instances", 0, root.localizer.FlagUsage("max-instances", "maximum instances per Association (0 is unlimited)"))
+	command.Flags().IntVar(&concurrency, "concurrency", 1, root.localizer.FlagUsage("concurrency", "maximum concurrent Associations"))
+	command.Flags().IntVar(&retries, "retries", 1, root.localizer.FlagUsage("retries", "retries for network and timeout failures"))
+	command.Flags().StringVar(&reportPath, "report", "", root.localizer.FlagUsage("report", "write detailed JSON report"))
+	command.Flags().StringVar(&failedListPath, "failed-list", "", root.localizer.FlagUsage("failed-list", "write failed paths as a newline-delimited list"))
+	command.Flags().BoolVarP(&asJSON, "json", "j", false, root.localizer.FlagUsage("json", "write JSON summary"))
 	return command
 }
 
-func bindDIMSEFlags(command *cobra.Command, options *dimseOptions) {
+func bindDIMSEFlags(command *cobra.Command, options *dimseOptions, localizer i18n.Localizer) {
 	flags := command.Flags()
-	flags.StringVarP(&options.target, "target", "t", "", "named PACS target")
-	flags.StringVar(&options.host, "host", "", "PACS host override")
-	flags.IntVar(&options.port, "port", 0, "PACS port override")
-	flags.StringVar(&options.callingAE, "calling-ae", "", "calling AE Title override")
-	flags.StringVar(&options.calledAE, "called-ae", "", "called AE Title override")
-	flags.DurationVar(&options.connectTimeout, "connect-timeout", 0, "TCP connection timeout")
-	flags.DurationVar(&options.associateTimeout, "associate-timeout", 0, "Association negotiation timeout")
-	flags.DurationVar(&options.idleTimeout, "idle-timeout", 0, "DIMSE read/write idle timeout")
+	flags.StringVarP(&options.target, "target", "t", "", localizer.FlagUsage("target", "named PACS target"))
+	flags.StringVar(&options.host, "host", "", localizer.FlagUsage("host", "PACS host override"))
+	flags.IntVar(&options.port, "port", 0, localizer.FlagUsage("port", "PACS port override"))
+	flags.StringVar(&options.callingAE, "calling-ae", "", localizer.FlagUsage("calling-ae", "calling AE Title override"))
+	flags.StringVar(&options.calledAE, "called-ae", "", localizer.FlagUsage("called-ae", "called AE Title override"))
+	flags.DurationVar(&options.connectTimeout, "connect-timeout", 0, localizer.FlagUsage("connect-timeout", "TCP connection timeout"))
+	flags.DurationVar(&options.associateTimeout, "associate-timeout", 0, localizer.FlagUsage("associate-timeout", "Association negotiation timeout"))
+	flags.DurationVar(&options.idleTimeout, "idle-timeout", 0, localizer.FlagUsage("idle-timeout", "DIMSE read/write idle timeout"))
 }
 
 func loadDIMSETarget(command *cobra.Command, runtime Runtime, root *rootOptions, options dimseOptions) (config.PACSTarget, error) {
