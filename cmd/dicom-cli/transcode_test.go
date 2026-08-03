@@ -17,7 +17,7 @@ func TestExecuteTranscodeFormatsListsRuntimeCodecsAndExperimentalHTJ2K(t *testin
 	if code := Execute([]string{"transcode", "formats", "--json"}, runtime); code != 0 {
 		t.Fatalf("transcode formats exit code = %d, want 0", code)
 	}
-	for _, want := range []string{"explicit-vr-little-endian", "1.2.840.10008.1.2.4.201", `"experimental":true`} {
+	for _, want := range []string{"explicit-vr-little-endian", "JPEG 2000 Lossless", "1.2.840.10008.1.2.4.201", `"experimental":true`} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("formats output does not contain %q:\n%s", want, stdout.String())
 		}
@@ -29,7 +29,18 @@ func TestExecuteTranscodeHelpExplainsTargetTransferSyntax(t *testing.T) {
 	if code := Execute([]string{"transcode", "--help"}, runtime); code != 0 {
 		t.Fatalf("transcode --help exit code = %d, want 0", code)
 	}
-	for _, want := range []string{"--to", "alias or UID", "transcode formats"} {
+	for _, want := range []string{
+		"transcode --input <file-or-directory>",
+		"--input string",
+		"input DICOM file or directory",
+		"output DICOM file or directory",
+		"--to",
+		"standard name, short name, or UID",
+		"JPEG 2000 Lossless",
+		"jpeg2000-lossless",
+		"1.2.840.10008.1.2.4.90",
+		"transcode formats",
+	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("transcode help does not contain %q:\n%s", want, stdout.String())
 		}
@@ -141,6 +152,36 @@ func TestExecuteTranscodeWritesRequestedSyntax(t *testing.T) {
 	}
 	if got, _ := parsed.FileMetaInformation.Dataset().GetString(tag.TransferSyntaxUID); got != transfer.ImplicitVRLittleEndian.UID().UID() {
 		t.Fatalf("file meta TransferSyntaxUID = %q", got)
+	}
+}
+
+func TestExecuteTranscodeAcceptsExplicitInputFlag(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output.dcm")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"transcode", "--input", fixtures.SingleFrame, "--to", "implicit-vr-little-endian", "--output", output}, runtime); code != 0 {
+		t.Fatalf("transcode --input exit code = %d, want 0", code)
+	}
+	if _, err := parser.ParseFile(output); err != nil {
+		t.Fatalf("parse transcode --input output: %v", err)
+	}
+}
+
+func TestExecuteTranscodeAcceptsStandardTransferSyntaxName(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output.dcm")
+	runtime, _, _ := testRuntime()
+	if code := Execute([]string{"transcode", "--input", fixtures.SingleFrame, "--to", "JPEG 2000 Lossless", "--output", output}, runtime); code != 0 {
+		t.Fatalf("transcode standard name exit code = %d, want 0", code)
+	}
+	if _, err := parser.ParseFile(output); err != nil {
+		t.Fatalf("parse transcode standard name output: %v", err)
 	}
 }
 

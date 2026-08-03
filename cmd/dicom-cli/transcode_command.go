@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -20,31 +21,43 @@ import (
 
 func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	text := root.localizer.Command("transcode")
-	var target, destination, filterName string
+	var input, target, destination, filterName string
 	var recursive, failFast, flatten bool
 	command := &cobra.Command{
-		Use:   "transcode <file>",
+		Use:   "transcode --input <file-or-directory>",
 		Short: text.Short,
-		Long:  text.Long,
+		Long:  transcodeHelpText(text.Long, root.localizer.IsChineseSimplified()),
 		Example: "  dicom-cli transcode formats\n" +
-			"  dicom-cli transcode --to rle --output compressed.dcm image.dcm\n" +
-			"  dicom-cli transcode --to 1.2.840.10008.1.2.1 --output output.dcm image.dcm",
-		Args: cobra.ExactArgs(1),
+			"  dicom-cli transcode --input image.dcm --to rle --output compressed.dcm\n" +
+			"  dicom-cli transcode --input study --recursive --to 1.2.840.10008.1.2.1 --output output",
+		Args: func(_ *cobra.Command, args []string) error {
+			if input != "" && len(args) > 0 {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("use either --input or one positional input, not both"))
+			}
+			if input == "" && len(args) != 1 {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input or one positional input is required"))
+			}
+			return nil
+		},
 		RunE: func(_ *cobra.Command, args []string) error {
+			inputPath := input
+			if inputPath == "" {
+				inputPath = args[0]
+			}
 			if target == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--to is required"))
 			}
 			if destination == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--output is required"))
 			}
-			if filepath.Clean(args[0]) == filepath.Clean(destination) {
+			if filepath.Clean(inputPath) == filepath.Clean(destination) {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("output path is the input path"))
 			}
 			format, err := dicom.ResolveTransferSyntax(target)
 			if err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
-			inputInfo, err := os.Stat(args[0])
+			inputInfo, err := os.Stat(inputPath)
 			if err != nil {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
@@ -53,7 +66,7 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				if err != nil {
 					return apperr.Wrap(apperr.KindInput, err)
 				}
-				entries, err := files.Scan(args[0], recursive, func(path string) (bool, string, error) {
+				entries, err := files.Scan(inputPath, recursive, func(path string) (bool, string, error) {
 					if condition == nil {
 						return true, "", nil
 					}
@@ -74,7 +87,7 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 					if entry.Skipped {
 						continue
 					}
-					outputPath, pathErr := files.OutputPath(entry.Path, args[0], destination, !flatten)
+					outputPath, pathErr := files.OutputPath(entry.Path, inputPath, destination, !flatten)
 					if pathErr == nil {
 						pathErr = transcodeFile(entry.Path, outputPath, format.Syntax)
 					}
@@ -95,14 +108,15 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			} else if !os.IsNotExist(err) {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
-			if err := transcodeFile(args[0], destination, format.Syntax); err != nil {
+			if err := transcodeFile(inputPath, destination, format.Syntax); err != nil {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
 			return nil
 		},
 	}
-	command.Flags().StringVar(&target, "to", "", root.localizer.FlagUsage("to", "target transfer syntax alias or UID; run 'transcode formats' to list values"))
-	command.Flags().StringVarP(&destination, "output", "o", "", root.localizer.FlagUsage("output", "output DICOM file"))
+	command.Flags().StringVarP(&input, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
+	command.Flags().StringVar(&target, "to", "", root.localizer.FlagUsage("to", "target transfer syntax name, short name, or UID, for example JPEG 2000 Lossless, jpeg2000-lossless, or 1.2.840.10008.1.2.4.90"))
+	command.Flags().StringVarP(&destination, "output", "o", "", root.localizer.FlagUsage("output", "output DICOM file or directory"))
 	command.Flags().BoolVarP(&recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
 	command.Flags().BoolVar(&failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
 	command.Flags().BoolVar(&flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
@@ -121,12 +135,19 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if asJSON {
 				return json.NewEncoder(runtime.Stdout).Encode(available)
 			}
+			header := "NAME\t--TO SHORT NAME\tUID\tENCODE\tDECODE\tSTATUS"
+			if root.localizer.IsChineseSimplified() {
+				header = "标准名称\t--TO 短名称\tUID\t编码\t解码\t状态"
+			}
+			if _, err := fmt.Fprintln(runtime.Stdout, header); err != nil {
+				return err
+			}
 			for _, format := range available {
 				marker := ""
 				if format.Experimental {
 					marker = " experimental"
 				}
-				if _, err := fmt.Fprintf(runtime.Stdout, "%s\t%s\tencode=%t\tdecode=%t%s\n", format.Alias, format.UID, format.Encode, format.Decode, marker); err != nil {
+				if _, err := fmt.Fprintf(runtime.Stdout, "%s\t%s\t%s\tencode=%t\tdecode=%t%s\n", format.Name, format.Alias, format.UID, format.Encode, format.Decode, marker); err != nil {
 					return err
 				}
 			}
@@ -138,6 +159,25 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	localizedHelpFlag(formats, root.localizer)
 	command.AddCommand(formats)
 	return command
+}
+
+func transcodeHelpText(base string, chinese bool) string {
+	header := "Available --to values in this binary (standard name | --to short name | UID):"
+	experimental := " experimental"
+	if chinese {
+		header = "当前二进制可用于 --to 的值（标准名称 | --to 短名称 | UID）："
+		experimental = " experimental"
+	}
+	lines := make([]string, 0, len(dicom.RuntimeCodecs())+2)
+	lines = append(lines, base, header)
+	for _, format := range dicom.RuntimeCodecs() {
+		marker := ""
+		if format.Experimental {
+			marker = experimental
+		}
+		lines = append(lines, fmt.Sprintf("  %s | %s | %s%s", format.Name, format.Alias, format.UID, marker))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func loadTranscodeFilter(runtime Runtime, configuredRules, name string) (*rules.Condition, error) {

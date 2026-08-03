@@ -1,7 +1,19 @@
 # dicom-cli 使用手册
 
-本手册描述当前 `dicom-cli` 二进制的命令契约。运行 `dicom-cli <命令> --help`
-可以查看与所用版本完全一致的帮助信息。
+本手册描述当前 `dicom-cli` 二进制的命令契约，面向交互使用和脚本集成。运行
+`dicom-cli <命令> --help` 可以查看所用版本完全一致的帮助信息。
+
+## 使用前先区分输入类型
+
+| 输入类型 | 命令 | 规则 |
+| --- | --- | --- |
+| 单个 DICOM 文件 | `inspect`、`validate`、`edit` | 只接受一个常规文件，不能传目录。 |
+| DICOM 文件或目录 | `anonymize`、`convert`、`transcode`、`send` | 目录默认仅扫描当前层；`--recursive` 才扫描子目录。 |
+| 外部图片 | `encapsulate image` | 支持 8 位灰度、8 位 RGB PNG/JPEG 和 16 位灰度 PNG。 |
+| 标准输入路径清单 | `send -` | 每行一个实例路径。 |
+
+会写出 DICOM、图片或 JSON 的命令不会修改原始输入。若没有显式 `--output`，不同
+命令会使用当前工作目录中的默认输出目录；每个命令的具体规则见对应小节。
 
 ## 全局参数与日志
 
@@ -19,8 +31,10 @@
 进度写入 stderr；调用脚本应按此分流。
 
 帮助、文本结果、进度和本工具生成的诊断使用运行配置根字段 `language`：`en`
-为默认英文，`zh-CN` 为简体中文。使用 `lang <en|zh-CN>` 会写入所选且已存在的
-配置文件，后续使用该配置的命令自动切换语言；`--config` 仍只负责选择配置文件。命令名、flag 名、
+为默认英文，`zh-CN` 为简体中文。`lang <en|zh-CN>` 与
+`config language <en|zh-CN>` 会保存语言设置；如果没有发现配置文件，前者会在
+当前目录创建 `dicom-cli.yaml`。通过 `--config` 选择已有配置时，语言设置写回该文件。
+命令名、flag 名、
 JSON 字段和值、退出码、规则 DSL、DICOM Tag 和 UID 不随语言变化。配置不存在、无法读取或
 `language` 非法时，诊断以英文输出。
 
@@ -33,9 +47,13 @@ JSON 字段和值、退出码、规则 DSL、DICOM Tag 和 UID 不随语言变�
 ## 配置与规则
 
 `config init [path]` 生成 YAML 配置；加 `--format json` 生成 JSON，已有文件只有
-传 `--force` 才允许覆盖。`config validate [path]` 校验配置。`lang <en|zh-CN>` 持久修改
-语言设置，`config language <en|zh-CN>` 保留为完整入口。语言和目标维护命令需要已存在的配置文件；可通过 `--config` 或
-`DICOM_CLI_CONFIG` 显式指定。
+传 `--force` 才允许覆盖。生成的 YAML 含有可替换的 `local-pacs` 示例目标和默认
+DIMSE 超时。`config validate [path]` 校验配置。
+
+`lang <en|zh-CN>` 是语言切换的简写，`config language <en|zh-CN>` 是等效的完整
+入口。语言命令可以在无配置时创建当前目录 `dicom-cli.yaml`；目标维护命令
+`config target ...` 则要求已经存在配置文件，可通过 `--config` 或
+`DICOM_CLI_CONFIG` 明确选择。
 
 命名 PACS 目标通过以下命令维护：
 
@@ -146,9 +164,9 @@ dicom-cli convert json --output metadata.json image.dcm
 只有 `--include-pixel-data` 才包含像素字节。
 
 两个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
-`--output`。目录默认不递归。图片二进制 stdout 要求恰好一个结果；多帧、多文件和
-目录输入不得使用 `--output -`。未传 `--output` 时，结果写入当前目录下的 `convert`
-子目录。
+`--output`。目录默认不递归；`convert image` 只处理 `.dcm` 文件，扩展名不匹配的
+目录项会作为跳过项。图片二进制 stdout 要求恰好一个结果；多帧、多文件和目录输入
+不得使用 `--output -`。未传 `--output` 时，结果写入当前目录下的 `convert` 子目录。
 
 ### encapsulate
 
@@ -162,22 +180,69 @@ dicom-cli encapsulate image --patient-name ANON^PATIENT --output image.dcm sourc
 不提供传输语法或压缩选项。目录模式支持 `--recursive`、`--flatten`、`--fail-fast` 和
 `--output`，并在一次调用内共享新 Study/Series UID、为每张图片生成独立 SOP Instance UID。
 单图输出路径必须使用 `.dcm` 扩展名；未传 `--output` 时，结果写入当前目录下的
-`convert` 子目录。
+`convert` 子目录。该命令不支持 TIFF、BMP、其他位深或压缩传输语法选择。
 
 ### transcode
 
 ```sh
 dicom-cli transcode formats
-dicom-cli transcode --to rle --output compressed.dcm image.dcm
-dicom-cli transcode --to 1.2.840.10008.1.2.1 --output output study
+dicom-cli transcode --input image.dcm --to rle --output compressed.dcm
+dicom-cli transcode --input image.dcm --to jpeg2000-lossless --output j2k-lossless.dcm
+dicom-cli transcode --input study --recursive --to 1.2.840.10008.1.2.1 --output output
 ```
 
 `transcode formats` 显示当前二进制实际注册的传输语法、别名和编码/解码能力，
 可加 `--json`。执行转码时 `--to` 和 `--output` 都必填；`--to` 接受
 `transcode formats` 输出的别名或标准传输语法 UID，例如 `--to rle` 或
-`--to 1.2.840.10008.1.2.1`。`transcode <file>` 接受单文件或目录；目录模式支持
-`--recursive`、`--flatten`、`--filter`、`--fail-fast`。转码只改变与编解码和传输语法
-有关的数据；输出路径不得是输入路径。
+`--to 1.2.840.10008.1.2.1`。
+
+`--to` 可直接传入表格中的**标准名称**、**短名称**或 **UID**。例如下面三种写法
+等价，均表示 JPEG 2000 Lossless：
+
+```sh
+dicom-cli transcode --input image.dcm --to "JPEG 2000 Lossless" --output output.dcm
+dicom-cli transcode --input image.dcm --to jpeg2000-lossless --output output.dcm
+dicom-cli transcode --input image.dcm --to 1.2.840.10008.1.2.4.90 --output output.dcm
+```
+
+当前二进制的 `--to` 完整清单如下。`transcode --help` 与 `transcode formats` 也会
+显示同一份“标准名称 / --to 短名称 / UID”信息；若未来构建注册的 codec 不同，以命令
+实际输出为准。
+
+| 标准名称（可直接传给 `--to`） | `--to` 短名称 | 标准 UID | 状态 |
+| --- | --- | --- | --- |
+| Implicit VR Little Endian | `implicit-vr-little-endian` | `1.2.840.10008.1.2` | 可用 |
+| Explicit VR Little Endian | `explicit-vr-little-endian` | `1.2.840.10008.1.2.1` | 可用 |
+| Explicit VR Big Endian | `explicit-vr-big-endian` | `1.2.840.10008.1.2.2` | 可用 |
+| RLE Lossless | `rle` | `1.2.840.10008.1.2.5` | 可用 |
+| JPEG Baseline | `jpeg-baseline` | `1.2.840.10008.1.2.4.50` | 可用 |
+| JPEG Extended | `jpeg-extended` | `1.2.840.10008.1.2.4.51` | 可用 |
+| JPEG Lossless | `jpeg-lossless` | `1.2.840.10008.1.2.4.57` | 可用 |
+| JPEG Lossless SV1 | `jpeg-lossless-sv1` | `1.2.840.10008.1.2.4.70` | 可用 |
+| JPEG-LS Lossless | `jpeg-ls` | `1.2.840.10008.1.2.4.80` | 可用 |
+| JPEG-LS Near-Lossless | `jpeg-ls-near-lossless` | `1.2.840.10008.1.2.4.81` | 可用 |
+| JPEG 2000 Lossless | `jpeg2000-lossless` | `1.2.840.10008.1.2.4.90` | 可用 |
+| JPEG 2000 | `jpeg2000` | `1.2.840.10008.1.2.4.91` | 可用 |
+| JPEG 2000 Multicomponent Lossless | `jpeg2000-multicomponent-lossless` | `1.2.840.10008.1.2.4.92` | 可用 |
+| JPEG 2000 Multicomponent | `jpeg2000-multicomponent` | `1.2.840.10008.1.2.4.93` | 可用 |
+| High-Throughput JPEG 2000 Lossless | `htj2k-lossless` | `1.2.840.10008.1.2.4.201` | experimental |
+| High-Throughput JPEG 2000 Lossless RPCL | `htj2k-lossless-rpcl` | `1.2.840.10008.1.2.4.202` | experimental |
+| High-Throughput JPEG 2000 | `htj2k` | `1.2.840.10008.1.2.4.203` | experimental |
+
+`transcode` 通过 **`--input/-i <path>`** 明确指定一个输入路径，不支持多个输入文件，
+也不支持 `-` 或 stdin 路径清单。为兼容旧脚本，也可将一个输入路径放在命令末尾；
+但不能与 `--input` 同时传入。输入类型决定 `--output` 的含义：
+
+| 调用形式 | `<input>` | `--output` | 写出结果 |
+| --- | --- | --- | --- |
+| `transcode -i <file.dcm> --to <syntax> -o <file.dcm>` | 一个 DICOM 文件 | 一个尚不存在的目标文件路径 | 仅写出一个新 DICOM 文件。 |
+| `transcode -i <directory> --to <syntax> -o <directory>` | 一个目录 | 输出根目录 | 当前层的每个可处理文件写到该目录。 |
+| `transcode -i <directory> --recursive --to <syntax> -o <directory>` | 一个目录 | 输出根目录 | 递归扫描并保留输入相对目录结构。 |
+
+目录模式支持 `--recursive`、`--flatten`、`--filter`、`--fail-fast`。默认不递归并保留
+相对目录结构；`--flatten` 将所有结果放入输出根目录，名称冲突时自动追加序号。
+`--filter` 仅用于目录输入。转码只改变与编解码和传输语法有关的数据；输出路径不得
+是输入路径。
 
 HTJ2K 显示为 experimental。能列出或完成合成样本转码不等于已验证真实样本互操作。
 
@@ -217,9 +282,18 @@ dicom-cli completion powershell > dicom-cli-completion.ps1
 
 ## 批处理、输出与退出码
 
-`anonymize`、`convert`、`transcode` 和目录模式 `send` 中，不符合规则筛选的文件为
-正常跳过；损坏或非 DICOM 文件会计为失败。默认批处理继续处理剩余文件，
-`--fail-fast` 会在首个失败后停止。
+`anonymize`、`convert`、`transcode` 和目录模式 `send` 中，规则筛选不匹配的文件为
+正常跳过。目录扫描会依命令的输入限制跳过不适用的扩展名；被选中但无法解析或处理
+的文件计为失败。默认批处理继续处理剩余文件，`--fail-fast` 会在首个失败后停止。
+
+输出安全边界如下：
+
+- `edit`、单文件 `anonymize` 和 `transcode` 拒绝把输出写回输入路径。
+- `anonymize --output -` 仅允许一个选中的输入文件，汇总改写到 stderr。
+- `convert image --output -` 仅允许一个图像结果；`convert json --output -` 可将 JSON
+  写入 stdout。
+- `--report` 和 `send --failed-list` 写入文件，不接受 `-`；脱敏报告可能含有原始值和
+  UID 映射，应按敏感数据处理。
 
 | 退出码 | 含义 |
 | --- | --- |

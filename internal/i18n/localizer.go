@@ -238,8 +238,8 @@ var englishCommands = map[string]CommandText{
 	"dicom-cli convert json":         {Short: "Export DICOM metadata as JSON", Long: "Export DICOM metadata as JSON. PixelData is summarized by default; use --include-pixel-data only when the full pixel bytes are required."},
 	"dicom-cli encapsulate":          {Short: "Encapsulate external content as DICOM", Long: "External images are imported into uncompressed Secondary Capture DICOM files. Select the image subcommand to provide metadata and output handling."},
 	"dicom-cli encapsulate image":    {Short: "Encapsulate PNG or JPEG images as Secondary Capture DICOM", Long: "Encapsulate supported PNG or JPEG images as uncompressed Explicit VR Little Endian Secondary Capture DICOM. PatientName must come from --patient-name, --template, or --reference. For directory input, Study and Series UIDs are shared while each image receives a distinct SOP Instance UID."},
-	"dicom-cli transcode":            {Short: "Re-encode DICOM transfer syntaxes", Long: "Re-encode DICOM transfer syntaxes.\n\n--to accepts a transfer syntax alias or standard UID. Run `dicom-cli transcode formats` to list values available in this binary. Both --to and --output are required, and the source file is never overwritten."},
-	"dicom-cli transcode formats":    {Short: "List transfer syntaxes available in this binary", Long: "List transfer syntax aliases, UIDs, and encode/decode capabilities registered in this binary. Use an alias or UID from this output with transcode --to."},
+	"dicom-cli transcode":            {Short: "Re-encode DICOM transfer syntaxes", Long: "Re-encode DICOM transfer syntaxes.\n\nProvide exactly one input path with --input (recommended) or as the optional positional argument. The input can be a DICOM file or a directory. With a file input, --output is the new DICOM file path; with a directory input, --output is the output directory. --to accepts a transfer syntax standard name, short name, or UID. Run `dicom-cli transcode formats` to list values available in this binary. Both --to and --output are required, and source files are never overwritten."},
+	"dicom-cli transcode formats":    {Short: "List transfer syntaxes available in this binary", Long: "List transfer syntax standard names, short names accepted by --to, UIDs, and encode/decode capabilities registered in this binary. Use a standard name, short name, or UID from this output with transcode --to."},
 	"dicom-cli echo":                 {Short: "Verify a DIMSE target with C-ECHO", Long: "Open a DIMSE Association and issue one C-ECHO request. C-ECHO verifies reachability and negotiation but does not modify remote data. Select --target or provide the connection overrides directly."},
 	"dicom-cli send":                 {Short: "Send DICOM instances with C-STORE", Long: "Send DICOM instances with C-STORE from one file, a directory, or newline-delimited paths on stdin. The command reuses Associations when possible and does not transcode source instances; transcode before sending when the target cannot accept the source transfer syntax."},
 }
@@ -296,8 +296,8 @@ var chineseCommandLong = map[string]string{
 	"dicom-cli convert json":         "将 DICOM 元数据导出为 JSON。默认仅汇总 PixelData；只有需要完整像素字节时才使用 --include-pixel-data。",
 	"dicom-cli encapsulate":          "将外部图像导入未压缩 Secondary Capture DICOM 文件。选择 image 子命令提供元数据和输出处理。",
 	"dicom-cli encapsulate image":    "将支持的 PNG 或 JPEG 图像封装为未压缩 Explicit VR Little Endian Secondary Capture DICOM。PatientName 必须来自 --patient-name、--template 或 --reference。目录输入时共享 Study 和 Series UID，每张图像获得独立 SOP Instance UID。",
-	"dicom-cli transcode":            "重编码 DICOM 传输语法。--to 接受传输语法别名或标准 UID；运行 dicom-cli transcode formats 可列出当前二进制可用值。--to 和 --output 均为必填，且绝不覆盖源文件。",
-	"dicom-cli transcode formats":    "列出当前二进制注册的传输语法别名、UID 及编解码能力。使用此输出中的别名或 UID 作为 transcode --to 的值。",
+	"dicom-cli transcode":            "重编码 DICOM 传输语法。使用 --input（推荐）或可选位置参数提供一个输入路径，二者只能传其一；输入可为 DICOM 文件或目录。文件输入时 --output 是新的 DICOM 文件路径，目录输入时 --output 是输出目录。--to 接受传输语法标准名称、短名称或标准 UID；运行 dicom-cli transcode formats 可列出当前二进制可用值。--to 和 --output 均为必填，且绝不覆盖源文件。",
+	"dicom-cli transcode formats":    "列出当前二进制注册的传输语法标准名称、可传给 --to 的短名称、UID 及编解码能力。使用此输出中的标准名称、短名称或 UID 作为 transcode --to 的值。",
 	"dicom-cli echo":                 "打开 DIMSE Association 并发起一次 C-ECHO 请求。C-ECHO 验证可达性和协商，但不会修改远程数据。选择 --target 或直接提供连接覆盖参数。",
 	"dicom-cli send":                 "从一个文件、目录或标准输入的逐行路径通过 C-STORE 发送 DICOM 实例。命令会尽可能复用 Association，且不会转码源实例；目标无法接受源传输语法时请先转码。",
 }
@@ -324,6 +324,7 @@ var chineseFlagUsage = map[string]string{
 	"host":               "PACS 主机覆盖值",
 	"idle-timeout":       "DIMSE 读写空闲超时",
 	"include-pixel-data": "包含 PixelData 字节",
+	"input":              "输入 DICOM 文件或目录",
 	"input-charset":      "覆盖输入字符集",
 	"json":               "输出 JSON",
 	"max-instances":      "每个 Association 的最大实例数（0 为不限）",
@@ -342,7 +343,7 @@ var chineseFlagUsage = map[string]string{
 	"tag":                "DICOM 关键字或十六进制 Tag 路径",
 	"target":             "命名 PACS 目标",
 	"template":           "规则中的命名 DICOM 模板",
-	"to":                 "目标传输语法别名或 UID",
+	"to":                 "目标传输语法名称、短名称或 UID",
 	"uid-root":           "生成 UID 使用的 UID 根",
 	"vr":                 "私有或未知 Tag 使用 TagPath=VR",
 }

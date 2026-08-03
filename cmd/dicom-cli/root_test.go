@@ -193,7 +193,7 @@ func TestExecuteHelpExplainsEveryProjectCommand(t *testing.T) {
 		{name: "convert json", args: []string{"convert", "json", "--help"}, want: "PixelData is summarized by default"},
 		{name: "encapsulate", args: []string{"encapsulate", "--help"}, want: "External images are imported"},
 		{name: "encapsulate image", args: []string{"encapsulate", "image", "--help"}, want: "Study and Series UIDs are shared"},
-		{name: "transcode", args: []string{"transcode", "--help"}, want: "--to accepts a transfer syntax alias or standard UID"},
+		{name: "transcode", args: []string{"transcode", "--help"}, want: "--to accepts a transfer syntax standard name, short name, or UID"},
 		{name: "transcode formats", args: []string{"transcode", "formats", "--help"}, want: "registered in this binary"},
 		{name: "echo", args: []string{"echo", "--help"}, want: "does not modify remote data"},
 		{name: "send", args: []string{"send", "--help"}, want: "does not transcode source instances"},
