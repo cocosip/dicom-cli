@@ -1,7 +1,7 @@
-github.com/cocosip/go-dicom v0.6.1 h1:glceH0+A8Sn0CJ1WLfpynZ0p75dkpDHZ6ZiCqzWnB7c=
-github.com/cocosip/go-dicom v0.6.1/go.mod h1:w29kd5uQL9hVRfvhvTv0njIK1hQXlghc/aSFCI3VWRQ=
-github.com/cocosip/go-dicom-codecs v0.6.1 h1:SAM4QLgmlxvV43+w2GwMgoWalXMMY7Q2rRziQvZcsxU=
-github.com/cocosip/go-dicom-codecs v0.6.1/go.mod h1:sZtX/KbzO6yVGQzEHOXQmYPOPcsEeJAJcxGhEV1iGqQ=
+github.com/cocosip/go-dicom v0.6.2 h1:FbTUwhErFfHGcBvPp6NTzu1y5QkCy3qEhiuoSFWXNbw=
+github.com/cocosip/go-dicom v0.6.2/go.mod h1:w29kd5uQL9hVRfvhvTv0njIK1hQXlghc/aSFCI3VWRQ=
+github.com/cocosip/go-dicom-codecs v0.6.2 h1:TFLsoh8bAtoyQB0gRlmfLMyUizl2RPZrS8y77yHYno4=
+github.com/cocosip/go-dicom-codecs v0.6.2/go.mod h1:oNRkfDO5DV38GbtRv1nykZ5zYaFICXVqly7kbSlFJno=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
