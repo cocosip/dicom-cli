@@ -27,7 +27,7 @@ func TestExecuteConvertImageAndJSONExportDICOM(t *testing.T) {
 	}
 	pngPath := filepath.Join(t.TempDir(), "frame.png")
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "image", "--format", "png", "--output", pngPath, fixtures.SingleFrame}, runtime); code != 0 {
+	if code := Execute([]string{"convert", "image", "--input", fixtures.SingleFrame, "--format", "png", "--output", pngPath}, runtime); code != 0 {
 		t.Fatalf("convert image exit code = %d, want 0", code)
 	}
 	pngContent, err := os.ReadFile(pngPath)
@@ -37,12 +37,30 @@ func TestExecuteConvertImageAndJSONExportDICOM(t *testing.T) {
 
 	jsonPath := filepath.Join(t.TempDir(), "metadata.json")
 	runtime, _, _ = testRuntime()
-	if code := Execute([]string{"convert", "json", "--output", jsonPath, fixtures.SingleFrame}, runtime); code != 0 {
+	if code := Execute([]string{"convert", "json", "-i", fixtures.SingleFrame, "--output", jsonPath}, runtime); code != 0 {
 		t.Fatalf("convert json exit code = %d, want 0", code)
 	}
 	jsonContent, err := os.ReadFile(jsonPath)
 	if err != nil || !strings.Contains(string(jsonContent), `"summary"`) {
 		t.Fatalf("JSON output = %q, err=%v", jsonContent, err)
+	}
+}
+
+func TestExecuteConvertRejectsMissingOrPositionalInput(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"convert", "image"},
+		{"convert", "json"},
+		{"convert", "image", fixtures.SingleFrame},
+		{"convert", "json", fixtures.SingleFrame},
+	} {
+		runtime, _, _ := testRuntime()
+		if code := Execute(args, runtime); code != 2 {
+			t.Fatalf("Execute(%v) = %d, want 2", args, code)
+		}
 	}
 }
 
@@ -184,7 +202,7 @@ func TestExecuteConvertImageRejectsMultipleFramesToStdout(t *testing.T) {
 		t.Fatal(err)
 	}
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "image", "--all-frames", "--output", "-", fixtures.MultiFrame}, runtime); code != 2 {
+	if code := Execute([]string{"convert", "image", "--input", fixtures.MultiFrame, "--all-frames", "--output", "-"}, runtime); code != 2 {
 		t.Fatalf("convert image --all-frames stdout exit code = %d, want 2", code)
 	}
 }
@@ -196,7 +214,7 @@ func TestExecuteConvertImageAllFramesUsesDeterministicNames(t *testing.T) {
 	}
 	output := filepath.Join(t.TempDir(), "frames")
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "image", "--all-frames", "--output", output, fixtures.MultiFrame}, runtime); code != 0 {
+	if code := Execute([]string{"convert", "image", "--input", fixtures.MultiFrame, "--all-frames", "--output", output}, runtime); code != 0 {
 		t.Fatalf("convert image exit code = %d, want 0", code)
 	}
 	for _, name := range []string{"multi-frame-frame-0001.png", "multi-frame-frame-0002.png"} {
@@ -214,7 +232,7 @@ func TestExecuteConvertImageAllFramesUsesDefaultConvertDirectory(t *testing.T) {
 	workingDirectory := t.TempDir()
 	runtime, _, _ := testRuntime()
 	runtime.Getwd = func() (string, error) { return workingDirectory, nil }
-	if code := Execute([]string{"convert", "image", "--all-frames", fixtures.MultiFrame}, runtime); code != 0 {
+	if code := Execute([]string{"convert", "image", "--input", fixtures.MultiFrame, "--all-frames"}, runtime); code != 0 {
 		t.Fatalf("convert image exit code = %d, want 0", code)
 	}
 	for _, name := range []string{"multi-frame-frame-0001.png", "multi-frame-frame-0002.png"} {
@@ -244,7 +262,7 @@ func TestExecuteConvertImageExportsDICOMDirectory(t *testing.T) {
 	}
 	output := filepath.Join(t.TempDir(), "output")
 	runtime, _, _ := testRuntime()
-	if code := Execute([]string{"convert", "image", "--output", output, input}, runtime); code != 0 {
+	if code := Execute([]string{"convert", "image", "--input", input, "--output", output}, runtime); code != 0 {
 		t.Fatalf("convert image directory exit code = %d, want 0", code)
 	}
 	for _, name := range []string{"one.png", "two.png"} {

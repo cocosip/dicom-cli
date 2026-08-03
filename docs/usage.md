@@ -154,14 +154,15 @@ dicom-cli anonymize --profile basic --recursive --filter ct-images --output anon
 ### convert
 
 ```sh
-dicom-cli convert image --format png --output image.png image.dcm
-dicom-cli convert image --all-frames --output frames image.dcm
-dicom-cli convert json --output metadata.json image.dcm
+dicom-cli convert image --input image.dcm --format png --output image.png
+dicom-cli convert image --input image.dcm --all-frames --output frames
+dicom-cli convert json --input image.dcm --output metadata.json
 ```
 
-`convert image <input>` 导出 PNG 或 JPEG。`--frame` 是从 1 开始的帧号；默认导出
-首帧，`--all-frames` 导出每一帧。`convert json <input>` 默认将 PixelData 写为摘要，
-只有 `--include-pixel-data` 才包含像素字节。
+`convert image` 和 `convert json` 都必须通过 `--input/-i <path>` 提供一个 DICOM 文件
+或目录，不支持位置输入参数。`convert image` 导出 PNG 或 JPEG。`--frame` 是从 1 开始的
+帧号；默认导出首帧，`--all-frames` 导出每一帧。`convert json` 默认将 PixelData 写为
+摘要，只有 `--include-pixel-data` 才包含像素字节。
 
 两个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
 `--output`。目录默认不递归；`convert image` 只处理 `.dcm` 文件，扩展名不匹配的

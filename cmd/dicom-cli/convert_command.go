@@ -34,6 +34,7 @@ type dicomExportOptions struct {
 func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	text := root.localizer.Command("convert")
 	options := dicomExportOptions{format: "png"}
+	var imageInput, jsonInput string
 	command := &cobra.Command{
 		Use:   "convert",
 		Short: text.Short,
@@ -43,16 +44,20 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 
 	imageText := root.localizer.Command("convert image")
 	imageCommand := &cobra.Command{
-		Use:   "image <input>",
+		Use:   "image --input <file-or-directory>",
 		Short: imageText.Short,
 		Long:  imageText.Long,
-		Example: "  dicom-cli convert image --format png --output image.png image.dcm\n" +
-			"  dicom-cli convert image --all-frames --output frames image.dcm",
-		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runDICOMExport(runtime, args[0], options)
+		Example: "  dicom-cli convert image --input image.dcm --format png --output image.png\n" +
+			"  dicom-cli convert image --input image.dcm --all-frames --output frames",
+		Args: noArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if imageInput == "" {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
+			}
+			return runDICOMExport(runtime, imageInput, options)
 		},
 	}
+	imageCommand.Flags().StringVarP(&imageInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
 	imageCommand.Flags().StringVar(&options.format, "format", "png", root.localizer.FlagUsage("format", "output format: png or jpeg"))
 	imageCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file, directory, or -"))
 	imageCommand.Flags().IntVar(&options.frame, "frame", 0, root.localizer.FlagUsage("frame", "one-based frame number"))
@@ -63,16 +68,20 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 
 	jsonText := root.localizer.Command("convert json")
 	jsonCommand := &cobra.Command{
-		Use:     "json <input>",
+		Use:     "json --input <file-or-directory>",
 		Short:   jsonText.Short,
 		Long:    jsonText.Long,
-		Example: "  dicom-cli convert json --output metadata.json image.dcm",
-		Args:    cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		Example: "  dicom-cli convert json --input image.dcm --output metadata.json",
+		Args:    noArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if jsonInput == "" {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
+			}
 			options.format = "json"
-			return runDICOMExport(runtime, args[0], options)
+			return runDICOMExport(runtime, jsonInput, options)
 		},
 	}
+	jsonCommand.Flags().StringVarP(&jsonInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
 	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
 	jsonCommand.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, root.localizer.FlagUsage("include-pixel-data", "include PixelData bytes"))
 	jsonCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))

@@ -78,8 +78,8 @@ profile 为内置 `basic`；命名 profile、筛选条件和模板来自规则�
 ### 导出与转码
 
 ```sh
-dicom-cli convert image --format png --output image.png study/image.dcm
-dicom-cli convert image --all-frames --output frames study/multiframe.dcm
+dicom-cli convert image --input study/image.dcm --format png --output image.png
+dicom-cli convert image --input study/multiframe.dcm --all-frames --output frames
 dicom-cli transcode formats
 dicom-cli transcode --input study/image.dcm --to rle --output compressed.dcm
 dicom-cli transcode --input study/image.dcm --to jpeg2000-lossless --output j2k-lossless.dcm
@@ -115,7 +115,7 @@ Get-Content failed-paths.txt | dicom-cli send --target local-pacs -
 | `validate <file>` | 执行内置和命名规则 profile 校验。 |
 | `edit <file>` | 写出经标签、UID 或字符集修改的新文件。 |
 | `anonymize <file-or-directory>` | 按内置或命名 profile 脱敏。 |
-| `convert image|json <input>` | 导出图像帧或 DICOM 元数据。 |
+| `convert image|json --input <path>` | 导出图像帧或 DICOM 元数据。 |
 | `encapsulate image <input>` | 将受支持的 PNG/JPEG 写为未压缩 Secondary Capture DICOM。 |
 | `transcode --input <path>` | 将一个 DICOM 文件或一个目录转码至指定传输语法。 |
 | `transcode formats` | 列出当前二进制实际注册的编解码能力。 |
