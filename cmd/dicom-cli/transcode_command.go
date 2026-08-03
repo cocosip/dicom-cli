@@ -47,12 +47,6 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if target == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--to is required"))
 			}
-			if destination == "" {
-				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--output is required"))
-			}
-			if filepath.Clean(inputPath) == filepath.Clean(destination) {
-				return apperr.Wrap(apperr.KindInput, fmt.Errorf("output path is the input path"))
-			}
 			format, err := dicom.ResolveTransferSyntax(target)
 			if err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
@@ -60,6 +54,22 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			inputInfo, err := os.Stat(inputPath)
 			if err != nil {
 				return apperr.Wrap(apperr.KindOperation, err)
+			}
+			if destination == "" {
+				workingDirectory, err := runtime.Getwd()
+				if err != nil {
+					return apperr.Wrap(apperr.KindOperation, err)
+				}
+				destination = files.DefaultOutputDirectory(workingDirectory, "transcode")
+				if !inputInfo.IsDir() {
+					destination, err = files.OutputPath(inputPath, inputPath, destination, false)
+					if err != nil {
+						return apperr.Wrap(apperr.KindOperation, err)
+					}
+				}
+			}
+			if filepath.Clean(inputPath) == filepath.Clean(destination) {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("output path is the input path"))
 			}
 			if inputInfo.IsDir() {
 				condition, err := loadTranscodeFilter(runtime, root.rulesPath, filterName)

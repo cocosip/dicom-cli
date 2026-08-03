@@ -155,6 +155,27 @@ func TestExecuteTranscodeWritesRequestedSyntax(t *testing.T) {
 	}
 }
 
+func TestExecuteTranscodeUsesSafeDefaultOutputDirectory(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	runtime, _, _ := testRuntime()
+	runtime.Getwd = func() (string, error) { return workingDirectory, nil }
+	if code := Execute([]string{"transcode", "--input", fixtures.SingleFrame, "--to", "implicit-vr-little-endian"}, runtime); code != 0 {
+		t.Fatalf("transcode without --output exit code = %d, want 0", code)
+	}
+	output := filepath.Join(workingDirectory, "transcode", filepath.Base(fixtures.SingleFrame))
+	parsed, err := parser.ParseFile(output)
+	if err != nil {
+		t.Fatalf("parse default transcode output: %v", err)
+	}
+	if parsed.TransferSyntax != transfer.ImplicitVRLittleEndian {
+		t.Fatalf("transfer syntax = %s, want Implicit VR Little Endian", parsed.TransferSyntax.UID())
+	}
+}
+
 func TestExecuteTranscodeAcceptsExplicitInputFlag(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {

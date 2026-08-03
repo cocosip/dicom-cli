@@ -192,8 +192,9 @@ dicom-cli transcode --input study --recursive --to 1.2.840.10008.1.2.1 --output 
 ```
 
 `transcode formats` 显示当前二进制实际注册的传输语法、别名和编码/解码能力，
-可加 `--json`。执行转码时 `--to` 和 `--output` 都必填；`--to` 接受
-`transcode formats` 输出的别名或标准传输语法 UID，例如 `--to rle` 或
+可加 `--json`。执行转码时只有 `--to` 必填；未传 `--output` 时，单文件结果写入
+当前目录下的 `transcode/<原文件名>`，目录输入则写入 `transcode` 并保留相对层级。
+`--to` 接受 `transcode formats` 输出的别名或标准传输语法 UID，例如 `--to rle` 或
 `--to 1.2.840.10008.1.2.1`。
 
 `--to` 可直接传入表格中的**标准名称**、**短名称**或 **UID**。例如下面三种写法
