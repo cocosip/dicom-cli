@@ -4,7 +4,6 @@ package convert
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
@@ -162,26 +161,40 @@ func dicomDecimal(ds *dataset.Dataset, field *tag.Tag, fallback float64) (float6
 	return parsed, nil
 }
 
-// ExportJSON produces DICOM JSON. PixelData is summarized unless callers
-// explicitly request the serialized inline binary representation.
-func ExportJSON(ds *dataset.Dataset, includePixelData bool) ([]byte, error) {
-	content, err := serialization.ToJSON(ds, serialization.WithIndent("  "))
-	if err != nil || includePixelData {
-		return content, err
-	}
-	var document map[string]any
-	if err := json.Unmarshal(content, &document); err != nil {
+// ExportJSON produces DICOM JSON metadata without PixelData.
+func ExportJSON(ds *dataset.Dataset) ([]byte, error) {
+	return serialization.ToJSON(metadataDataset(ds), serialization.WithIndent("  "))
+}
+
+// ExportXML produces Native DICOM Model XML metadata without PixelData.
+func ExportXML(ds *dataset.Dataset) ([]byte, error) {
+	return serialization.ToXML(metadataDataset(ds))
+}
+
+// ExportPixelData concatenates the stored payload of each frame without
+// decoding or transcoding it.
+func ExportPixelData(ds *dataset.Dataset) ([]byte, error) {
+	pixelData, err := imaging.CreatePixelData(ds)
+	if err != nil {
 		return nil, err
 	}
-	if pixel, ok := document["7FE00010"].(map[string]any); ok {
-		document["7FE00010"] = map[string]any{
-			"vr": pixel["vr"],
-			"summary": map[string]any{
-				"present": true,
-			},
+	var content bytes.Buffer
+	for frame := 0; frame < pixelData.FrameCount(); frame++ {
+		data, err := pixelData.GetFrame(frame)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := content.Write(data); err != nil {
+			return nil, err
 		}
 	}
-	return json.MarshalIndent(document, "", "  ")
+	return content.Bytes(), nil
+}
+
+func metadataDataset(ds *dataset.Dataset) *dataset.Dataset {
+	clone := ds.Clone()
+	clone.Remove(tag.PixelData)
+	return clone
 }
 
 // FrameCount returns the number of frames in a DICOM dataset.

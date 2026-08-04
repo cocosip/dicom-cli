@@ -198,7 +198,8 @@ dicom_templates:
 第一版支持：
 
 - 从 DICOM 导出像素数据为 PNG 或 JPEG。
-- 从 DICOM 导出元数据为 JSON，直接使用 `go-dicom` 已支持的 JSON 序列化能力；默认仅输出 `PixelData` 摘要，显式 `--include-pixel-data` 时才以 Base64 输出原始像素内容。
+- 从 DICOM 导出不含 PixelData 的 JSON 或 Native DICOM Model XML 元数据，直接使用 `go-dicom` 已支持的序列化能力。
+- 将 PixelData 作为独立二进制文件导出；按帧顺序写入存储载荷，不解码、不转码，不包含 DICOM 元素头、Basic Offset Table 或 fragment Item 头。
 - 将图片封装为 DICOM：同时支持 JSON/YAML 元数据模板与参考 DICOM 模板，命令行参数可覆盖指定字段。
 - DICOM 传输语法转码：将输入 DICOM 从一种传输语法转换为另一种传输语法，目标可以是未压缩语法或压缩语法。
 
@@ -244,8 +245,9 @@ CLI 编译时导入相应 codec 注册包，`transcode formats` 只列出当前�
 
 源 DICOM 为高位灰度而目标为 JPEG 时，按源像素样本范围线性缩放为 8 位；导出 PNG 则保留可用的原始位深。
 
-`convert` 只接受 DICOM 输入，并按子命令导出图片或 JSON；图片格式由
-`convert image --format png|jpeg` 选择。传输语法目标只使用 `transcode --to` 指定。
+`convert` 只接受 DICOM 输入，并按子命令导出图片、JSON/XML 元数据或 PixelData 二进制
+载荷；图片格式由 `convert image --format png|jpeg` 选择。传输语法目标只使用
+`transcode --to` 指定。
 
 ## 校验范围
 
@@ -296,6 +298,8 @@ dicom-cli
   edit <file>                            # 单文件 Tag 修改
   convert image <file-or-directory>      # DICOM 导出 PNG/JPEG
   convert json <file-or-directory>       # DICOM 元数据导出 JSON
+  convert xml <file-or-directory>        # DICOM 元数据导出 Native DICOM Model XML
+  convert pixeldata <file-or-directory>  # DICOM 导出原始 PixelData 帧载荷
   encapsulate image <file-or-directory>  # PNG/JPEG 封装 Secondary Capture DICOM
   transcode <file-or-directory> --to ... # 传输语法转换
   transcode formats                       # 列出可用传输语法

@@ -164,14 +164,18 @@ dicom-cli anonymize --profile basic --recursive --filter ct-images --output anon
 dicom-cli convert image --input image.dcm --format png --output image.png
 dicom-cli convert image --input image.dcm --all-frames --output frames
 dicom-cli convert json --input image.dcm --output metadata.json
+dicom-cli convert xml --input image.dcm --output metadata.xml
+dicom-cli convert pixeldata --input image.dcm --output pixels.bin
 ```
 
-`convert image` 和 `convert json` 都必须通过 `--input/-i <path>` 提供一个 DICOM 文件
-或目录，不支持位置输入参数。`convert image` 导出 PNG 或 JPEG。`--frame` 是从 1 开始的
-帧号；默认导出首帧，`--all-frames` 导出每一帧。`convert json` 默认将 PixelData 写为
-摘要，只有 `--include-pixel-data` 才包含像素字节。
+四个子命令都必须通过 `--input/-i <path>` 提供一个 DICOM 文件或目录，不支持位置输入
+参数。`convert image` 导出 PNG 或 JPEG。`--frame` 是从 1 开始的帧号；默认导出首帧，
+`--all-frames` 导出每一帧。`convert json` 和 `convert xml` 都只导出元数据，不包含
+PixelData。`convert pixeldata` 将原始帧载荷按顺序拼接为 `.bin` 文件；未压缩实例写出原始
+采样字节，封装压缩实例写出压缩帧字节，不解码、不转码，也不包含 DICOM 元素头、Basic
+Offset Table 或 fragment Item 头。
 
-两个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
+四个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
 `--output`。目录默认不递归；`convert image` 只处理 `.dcm` 文件，扩展名不匹配的
 目录项会作为跳过项。图片二进制 stdout 要求恰好一个结果；多帧、多文件和目录输入
 不得使用 `--output -`。未传 `--output` 时，结果写入当前目录下的 `convert` 子目录。
@@ -299,8 +303,8 @@ dicom-cli completion powershell > dicom-cli-completion.ps1
 
 - `edit`、单文件 `anonymize` 和 `transcode` 拒绝把输出写回输入路径。
 - `anonymize --output -` 仅允许一个选中的输入文件，汇总改写到 stderr。
-- `convert image --output -` 仅允许一个图像结果；`convert json --output -` 可将 JSON
-  写入 stdout。
+- `convert image --output -` 仅允许一个图像结果；单文件输入时，`convert json --output -`、
+  `convert xml --output -` 和 `convert pixeldata --output -` 可分别写入 stdout。
 - `--report` 和 `send --failed-list` 写入文件，不接受 `-`；脱敏报告可能含有原始值和
   UID 映射，应按敏感数据处理。
 

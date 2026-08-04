@@ -21,20 +21,19 @@ import (
 )
 
 type dicomExportOptions struct {
-	format           string
-	destination      string
-	frame            int
-	allFrames        bool
-	includePixelData bool
-	recursive        bool
-	failFast         bool
-	flatten          bool
+	format      string
+	destination string
+	frame       int
+	allFrames   bool
+	recursive   bool
+	failFast    bool
+	flatten     bool
 }
 
 func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	text := root.localizer.Command("convert")
 	options := dicomExportOptions{format: "png"}
-	var imageInput, jsonInput string
+	var imageInput, jsonInput, xmlInput, pixelDataInput string
 	command := &cobra.Command{
 		Use:   "convert",
 		Short: text.Short,
@@ -83,15 +82,58 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	}
 	jsonCommand.Flags().StringVarP(&jsonInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
 	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
-	jsonCommand.Flags().BoolVar(&options.includePixelData, "include-pixel-data", false, root.localizer.FlagUsage("include-pixel-data", "include PixelData bytes"))
 	jsonCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
 	jsonCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
 	jsonCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
 
+	xmlText := root.localizer.Command("convert xml")
+	xmlCommand := &cobra.Command{
+		Use:     "xml --input <file-or-directory>",
+		Short:   xmlText.Short,
+		Long:    xmlText.Long,
+		Example: "  dicom-cli convert xml --input image.dcm --output metadata.xml",
+		Args:    noArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if xmlInput == "" {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
+			}
+			options.format = "xml"
+			return runDICOMExport(runtime, xmlInput, options)
+		},
+	}
+	xmlCommand.Flags().StringVarP(&xmlInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
+	xmlCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
+	xmlCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+	xmlCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+	xmlCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
+
+	pixelDataText := root.localizer.Command("convert pixeldata")
+	pixelDataCommand := &cobra.Command{
+		Use:     "pixeldata --input <file-or-directory>",
+		Short:   pixelDataText.Short,
+		Long:    pixelDataText.Long,
+		Example: "  dicom-cli convert pixeldata --input image.dcm --output pixels.bin",
+		Args:    noArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if pixelDataInput == "" {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
+			}
+			options.format = "pixeldata"
+			return runDICOMExport(runtime, pixelDataInput, options)
+		},
+	}
+	pixelDataCommand.Flags().StringVarP(&pixelDataInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
+	pixelDataCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
+	pixelDataCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+	pixelDataCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+	pixelDataCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
+
 	localizedHelpFlag(command, root.localizer)
 	localizedHelpFlag(imageCommand, root.localizer)
 	localizedHelpFlag(jsonCommand, root.localizer)
-	command.AddCommand(imageCommand, jsonCommand)
+	localizedHelpFlag(xmlCommand, root.localizer)
+	localizedHelpFlag(pixelDataCommand, root.localizer)
+	command.AddCommand(imageCommand, jsonCommand, xmlCommand, pixelDataCommand)
 	return command
 }
 
@@ -241,13 +283,13 @@ func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) e
 	if format == "jpg" {
 		format = string(convertpkg.JPEG)
 	}
-	if format != string(convertpkg.PNG) && format != string(convertpkg.JPEG) && format != "json" {
+	if format != string(convertpkg.PNG) && format != string(convertpkg.JPEG) && format != "json" && format != "xml" && format != "pixeldata" {
 		return apperr.Wrap(apperr.KindInput, fmt.Errorf("unsupported conversion format %q", options.format))
 	}
 	if options.frame < 0 {
 		return apperr.Wrap(apperr.KindInput, fmt.Errorf("--frame must be positive"))
 	}
-	if options.allFrames && format == "json" {
+	if options.allFrames && format != string(convertpkg.PNG) && format != string(convertpkg.JPEG) {
 		return apperr.Wrap(apperr.KindInput, fmt.Errorf("--all-frames applies only to image output"))
 	}
 	if options.allFrames && options.destination == "-" {
@@ -311,7 +353,7 @@ func destinationForDICOMExport(path, root, destination, format string, options d
 	if options.allFrames {
 		return filepath.Dir(name)
 	}
-	return strings.TrimSuffix(name, filepath.Ext(name)) + "." + format
+	return strings.TrimSuffix(name, filepath.Ext(name)) + "." + exportExtension(format)
 }
 
 func runDICOMExportFile(runtime Runtime, input, format string, options dicomExportOptions, destination string) error {
@@ -319,12 +361,20 @@ func runDICOMExportFile(runtime Runtime, input, format string, options dicomExpo
 	if err != nil {
 		return apperr.Wrap(apperr.KindOperation, err)
 	}
-	if format == "json" {
-		content, err := convertpkg.ExportJSON(parsed.Dataset, options.includePixelData)
+	if format == "json" || format == "xml" || format == "pixeldata" {
+		var content []byte
+		switch format {
+		case "json":
+			content, err = convertpkg.ExportJSON(parsed.Dataset)
+		case "xml":
+			content, err = convertpkg.ExportXML(parsed.Dataset)
+		case "pixeldata":
+			content, err = convertpkg.ExportPixelData(parsed.Dataset)
+		}
 		if err != nil {
 			return apperr.Wrap(apperr.KindOperation, err)
 		}
-		return writeExport(runtime, input, destination, "json", content)
+		return writeExport(runtime, input, destination, exportExtension(format), content)
 	}
 	frameCount, err := convertpkg.FrameCount(parsed.Dataset)
 	if err != nil {
@@ -366,6 +416,13 @@ func runDICOMExportFile(runtime Runtime, input, format string, options dicomExpo
 		}
 	}
 	return nil
+}
+
+func exportExtension(format string) string {
+	if format == "pixeldata" {
+		return "bin"
+	}
+	return format
 }
 
 func writeExport(runtime Runtime, input, destination, extension string, content []byte) error {

@@ -20,7 +20,7 @@ import (
 	"github.com/cocosip/go-dicom/pkg/dicom/writer"
 )
 
-func TestExecuteConvertImageAndJSONExportDICOM(t *testing.T) {
+func TestExecuteConvertImageMetadataAndPixelDataExportDICOM(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -41,8 +41,28 @@ func TestExecuteConvertImageAndJSONExportDICOM(t *testing.T) {
 		t.Fatalf("convert json exit code = %d, want 0", code)
 	}
 	jsonContent, err := os.ReadFile(jsonPath)
-	if err != nil || !strings.Contains(string(jsonContent), `"summary"`) {
+	if err != nil || bytes.Contains(jsonContent, []byte(`"7FE00010"`)) {
 		t.Fatalf("JSON output = %q, err=%v", jsonContent, err)
+	}
+
+	xmlPath := filepath.Join(t.TempDir(), "metadata.xml")
+	runtime, _, _ = testRuntime()
+	if code := Execute([]string{"convert", "xml", "-i", fixtures.SingleFrame, "--output", xmlPath}, runtime); code != 0 {
+		t.Fatalf("convert xml exit code = %d, want 0", code)
+	}
+	xmlContent, err := os.ReadFile(xmlPath)
+	if err != nil || !bytes.Contains(xmlContent, []byte("<NativeDicomModel")) || bytes.Contains(xmlContent, []byte(`tag="7FE00010"`)) {
+		t.Fatalf("XML output = %q, err=%v", xmlContent, err)
+	}
+
+	pixelDataPath := filepath.Join(t.TempDir(), "pixels.bin")
+	runtime, _, _ = testRuntime()
+	if code := Execute([]string{"convert", "pixeldata", "-i", fixtures.SingleFrame, "--output", pixelDataPath}, runtime); code != 0 {
+		t.Fatalf("convert pixeldata exit code = %d, want 0", code)
+	}
+	pixelData, err := os.ReadFile(pixelDataPath)
+	if err != nil || !bytes.Equal(pixelData, []byte{0, 0, 1, 0}) {
+		t.Fatalf("PixelData output = %v, err=%v", pixelData, err)
 	}
 }
 
@@ -54,8 +74,13 @@ func TestExecuteConvertRejectsMissingOrPositionalInput(t *testing.T) {
 	for _, args := range [][]string{
 		{"convert", "image"},
 		{"convert", "json"},
+		{"convert", "xml"},
+		{"convert", "pixeldata"},
 		{"convert", "image", fixtures.SingleFrame},
 		{"convert", "json", fixtures.SingleFrame},
+		{"convert", "xml", fixtures.SingleFrame},
+		{"convert", "pixeldata", fixtures.SingleFrame},
+		{"convert", "json", "--include-pixel-data", "--input", fixtures.SingleFrame},
 	} {
 		runtime, _, _ := testRuntime()
 		if code := Execute(args, runtime); code != 2 {
@@ -313,7 +338,7 @@ func TestExecuteConvertHelpListsOnlyDICOMExportSubcommands(t *testing.T) {
 	if code := Execute([]string{"convert", "--help"}, runtime); code != 0 {
 		t.Fatalf("convert --help exit code = %d, want 0", code)
 	}
-	for _, want := range []string{"image", "json"} {
+	for _, want := range []string{"image", "json", "xml", "pixeldata"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("convert help does not contain %q:\n%s", want, stdout.String())
 		}

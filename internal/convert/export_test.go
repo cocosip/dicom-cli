@@ -2,7 +2,6 @@ package convert
 
 import (
 	"bytes"
-	"encoding/json"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -129,7 +128,7 @@ func TestExportFrameAppliesCTRescaleAndWindowForJPEG(t *testing.T) {
 	}
 }
 
-func TestExportJSONDefaultsToPixelDataSummary(t *testing.T) {
+func TestExportJSONOmitsPixelData(t *testing.T) {
 	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -139,30 +138,56 @@ func TestExportJSONDefaultsToPixelDataSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	summary, err := ExportJSON(parsed.Dataset, false)
+	content, err := ExportJSON(parsed.Dataset)
 	if err != nil {
 		t.Fatal(err)
 	}
-	full, err := ExportJSON(parsed.Dataset, true)
+	if bytes.Contains(content, []byte(`"7FE00010"`)) {
+		t.Fatalf("JSON contains PixelData: %s", content)
+	}
+	if _, exists := parsed.Dataset.Get(tag.PixelData); !exists {
+		t.Fatal("ExportJSON removed PixelData from the source dataset")
+	}
+}
+
+func TestExportXMLOmitsPixelData(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	var summaryDocument, fullDocument map[string]any
-	if err := json.Unmarshal(summary, &summaryDocument); err != nil {
+	parsed, err := parser.ParseFile(fixtures.SingleFrame)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(full, &fullDocument); err != nil {
+
+	content, err := ExportXML(parsed.Dataset)
+	if err != nil {
 		t.Fatal(err)
 	}
-	summaryPixel := summaryDocument["7FE00010"].(map[string]any)
-	fullPixel := fullDocument["7FE00010"].(map[string]any)
-	if _, ok := summaryPixel["summary"]; !ok {
-		t.Fatalf("summary PixelData = %#v, want summary", summaryPixel)
+	if bytes.Contains(content, []byte(`tag="7FE00010"`)) {
+		t.Fatalf("XML contains PixelData: %s", content)
 	}
-	if _, ok := summaryPixel["InlineBinary"]; ok {
-		t.Fatalf("summary PixelData = %#v, must not include bytes", summaryPixel)
+	if _, exists := parsed.Dataset.Get(tag.PixelData); !exists {
+		t.Fatal("ExportXML removed PixelData from the source dataset")
 	}
-	if _, ok := fullPixel["InlineBinary"]; !ok {
-		t.Fatalf("full PixelData = %#v, want InlineBinary", fullPixel)
+}
+
+func TestExportPixelDataConcatenatesRawFrames(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parser.ParseFile(fixtures.MultiFrame)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	content, err := ExportPixelData(parsed.Dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []byte{0, 0, 1, 0, 2, 0, 3, 0}
+	if !bytes.Equal(content, want) {
+		t.Fatalf("PixelData = %v, want %v", content, want)
 	}
 }

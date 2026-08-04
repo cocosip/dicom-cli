@@ -77,8 +77,8 @@
 - [x] **P5.2 实现 transcode formats**：依赖 P5.1；完成条件：列出编码/解码能力，HTJ2K 显示 experimental 标记。
 - [x] **P5.3 实现 DICOM 到 PNG/JPEG 帧导出**：依赖 P2.2、P2.9、P5.1；完成条件：默认首帧、`--frame`、`--all-frames` 与文件命名测试通过。
 - [x] **P5.4 实现图片导出像素策略**：依赖 P5.3；完成条件：不应用显示 LUT/窗宽窗位，高位灰度 JPEG 缩放与 PNG 位深保留测试通过。
-- [x] **P5.5 实现 DICOM 元数据 JSON**：依赖 P2.2、P2.9；完成条件：默认 PixelData 摘要，显式选项才 Base64 输出像素内容。
-- [x] **P5.6 统一图片/JSON 转换入口**：依赖 P5.3-P5.5；完成条件：`convert image`、`convert json` 仅接收 DICOM 输入并通过集成测试。
+- [x] **P5.5 实现 DICOM 元数据 JSON/XML 与 PixelData 导出**：依赖 P2.2、P2.9；完成条件：JSON/XML 始终省略 PixelData，`convert pixeldata` 按帧顺序导出原始存储载荷。
+- [x] **P5.6 统一图片/元数据/PixelData 转换入口**：依赖 P5.3-P5.5；完成条件：`convert image`、`convert json`、`convert xml`、`convert pixeldata` 仅接收 DICOM 输入并通过集成测试。
 - [x] **P5.7 实现图片输入限制**：依赖 P2.2；完成条件：支持 8 位灰度、8 位 RGB PNG/JPEG 和 16 位灰度 PNG，TIFF/BMP/不支持位深失败。
 - [x] **P5.8 实现图片到 DICOM 模板合并**：依赖 P1.6、P5.7；完成条件：规则模板、参考 DICOM、命令行覆盖优先级正确，缺少不可推断必填字段失败。
 - [x] **P5.9 实现 Secondary Capture UID 分组**：依赖 P2.5、P5.8；完成条件：图片目录在一次调用内共享新 Study/Series UID，每图有独立 SOP UID。
