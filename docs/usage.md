@@ -119,6 +119,13 @@ dicom-cli edit image.dcm --generate-uid StudyInstanceUID --uid-root 1.2.156.1126
 与输出路径相同，且至少需要一个编辑操作。未传 `--output` 时，结果写入当前目录下的
 `edit` 子目录。
 
+在 PowerShell 中，`--set` 的值包含空格时，必须为整个 `TagPath=value` 参数加引号，
+不能只引用等号右侧的值；否则空格后的文本会被视为额外的位置参数。例如：
+
+```powershell
+dicom-cli edit D:\11.dcm --set "0008,1030=Study Description" --set 01f1,104e=xx
+```
+
 ## anonymize
 
 ```sh
