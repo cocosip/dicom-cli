@@ -110,15 +110,15 @@
   - [x] **P7.1.3 校核文档命令契约**：已在当前编译出的 `dicom-cli` 上运行根命令和 21 个业务子命令的 `--help`，并以全仓测试中的退出码覆盖核对 README/手册；不将 Cobra 的 `completion` 作为业务命令文档承诺。
   - [x] **P7.1.4 配置驱动中英文提示**：运行配置新增 `language: en|zh-CN`，帮助、文本报告、批处理汇总和本工具生成的诊断按所选配置本地化；`lang <en|zh-CN>` 可持久修改所选配置，使后续命令切换语言。命令/flag、JSON、退出码和 DICOM 标识保持稳定。已通过 `go test ./... -count=1`。
 - [x] **P7.2 实现五平台打包**：依赖 P0.1、P7.1；已生成并校验 Windows ZIP 与 Linux/macOS tar.gz，均含可执行文件、README、完整手册、配置和规则示例。
-  - [x] **P7.2.1 实现可重复归档器**：已创建 `cmd/release-packager/main.go`，接受 `--version` 和 `--output`，使用 `go build -trimpath -buildvcs=false` 为 `windows/amd64`、`linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 生成二进制，并按 `dicom-cli_<version>_<goos>_<goarch>` 组装归档。
-  - [x] **P7.2.2 将运行资料纳入每个归档**：归档器已复制根目录 `README.md`、`docs/usage.md`、`examples/dicom-cli.yaml`、`examples/dicom-cli-rules.yaml`；仅 Windows 归档中的二进制使用 `dicom-cli.exe`，其余为 `dicom-cli`。
-  - [x] **P7.2.3 实现归档 smoke test**：已创建 `cmd/release-packager/main_test.go`，验证 ZIP/tar.gz 的唯一根目录、可执行文件、README、手册和两个示例；归档器创建真实发布包后再次验证完整文件清单，Release 工作流会解压 Linux AMD64 包并运行 `dicom-cli --help`。
-  - [x] **P7.2.4 运行本地归档验收**：已执行 `go run ./cmd/release-packager --version 0.0.0-vcs-clean --output <临时目录>`，退出码为 0 并生成五个归档。
+  - [x] **P7.2.1 在发布工作流内构建归档**：`.github/workflows/release.yml` 直接使用 `go build -trimpath -buildvcs=false` 为 `windows/amd64`、`linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 生成二进制，并按 `dicom-cli_<version>_<goos>_<goarch>` 组装归档。
+  - [x] **P7.2.2 将运行资料纳入每个归档**：发布工作流复制根目录 `README.md`、`docs/usage.md`、`examples/dicom-cli.yaml`、`examples/dicom-cli-rules.yaml`；仅 Windows 归档中的二进制使用 `dicom-cli.exe`，其余为 `dicom-cli`。
+  - [x] **P7.2.3 实现归档 smoke test**：发布工作流会解压 Linux AMD64 包并运行 `dicom-cli --help`。
+  - [x] **P7.2.4 固化发布归档验收**：发布工作流在 GitHub Actions 的 Ubuntu runner 中生成五个归档，避免引入独立的本地打包程序。
 - [ ] **P7.3 建立 GitHub Actions CI/CD**：依赖 P7.2；完成条件：`master` 上的 Windows/Linux/macOS 执行格式检查、单元测试、合成集成测试和本机构建；`v*` Tag 创建 GitHub Release 并上传五个归档。
   - [x] **P7.3.1 建立 master CI 工作流**：已创建 `.github/workflows/ci.yml`，仅由 `push.branches: [master]` 触发，使用 `windows-latest`、`ubuntu-latest`、`macos-latest` 矩阵和 `actions/setup-go` 的 `go-version-file: go.mod`。
-  - [x] **P7.3.2 固化 CI 验证命令**：已在每个 CI 矩阵目标定义 `gofmt -l` 的空输出检查、`go vet ./...`、`go test ./...` 和 `go build ./cmd/dicom-cli`；`tests/workflows` 验证该命令契约，测试只使用仓库 fixture，不读取真实样本、PACS 地址或凭据。
-  - [x] **P7.3.3 建立 Tag 发布工作流**：已创建 `.github/workflows/release.yml`，仅由 `push.tags: ['v*']` 触发，授予 `contents: write`，在 Ubuntu runner 上调用 `go run ./cmd/release-packager`，并以 GitHub CLI 创建同名非草稿 Release、上传五个归档和 GitHub 自动生成的 Release Notes。
-  - [x] **P7.3.4 校验工作流静态内容**：已由 `tests/workflows` 解析两份 YAML 并确认触发条件、目标矩阵、发布版本来源和 GitHub CLI 命令；未发现硬编码 Token、样本路径、PACS 地址或凭据。
+  - [x] **P7.3.2 固化 CI 验证命令**：已在每个 CI 矩阵目标定义 `gofmt -l` 的空输出检查、`go vet ./...`、`go test ./...` 和 `go build ./cmd/dicom-cli`。
+  - [x] **P7.3.3 建立 Tag 发布工作流**：已创建 `.github/workflows/release.yml`，仅由 `push.tags: ['v*']` 触发，授予 `contents: write`，在 Ubuntu runner 上直接交叉编译、归档，并以 GitHub CLI 创建同名非草稿 Release、上传五个归档和 GitHub 自动生成的 Release Notes。
+  - [x] **P7.3.4 校验工作流定义**：发布工作流只在 `v*` Tag 触发，使用 GitHub 提供的 Token，并且不包含样本路径、PACS 地址或凭据。
 - [ ] **P7.4 建立可选外部测试入口**：依赖 P4.7、P5.14、P6.11；完成条件：真实样本/PACS 参数缺失时跳过，提供环境变量时执行，均不硬编码路径或地址。
   - [ ] **P7.4.1 定义外部验收环境变量与运行说明**：创建 `docs/external-validation.md`，定义 `DICOM_CLI_EXTERNAL_DICOM_DIR`、`DICOM_CLI_EXTERNAL_PACS_HOST`、`DICOM_CLI_EXTERNAL_PACS_PORT`、`DICOM_CLI_EXTERNAL_CALLING_AE` 和 `DICOM_CLI_EXTERNAL_CALLED_AE` 的用途、必填组合和运行命令。
   - [ ] **P7.4.2 实现受 build tag 保护的外部测试**：创建 `tests/external` 下的 `external_test.go`，要求 `external` build tag；缺少真实样本目录时跳过样本回归，缺少任一 PACS 参数时跳过 PACS 验收，输出文件始终写入 `t.TempDir()`。

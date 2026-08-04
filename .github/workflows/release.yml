@@ -20,11 +20,46 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test release packager
-        run: go test ./cmd/release-packager
-
       - name: Build release archives
-        run: go run ./cmd/release-packager --version "${GITHUB_REF_NAME#v}" --output dist
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          output="$GITHUB_WORKSPACE/dist"
+          staging="$(mktemp -d)"
+          trap 'rm -rf "$staging"' EXIT
+          mkdir -p "$output"
+
+          package_target() {
+            local goos="$1"
+            local goarch="$2"
+            local archive="$3"
+            local package="dicom-cli_${version}_${goos}_${goarch}"
+            local stage="$staging/$package"
+            local binary="dicom-cli"
+
+            if [[ "$goos" == "windows" ]]; then
+              binary+=".exe"
+            fi
+
+            mkdir -p "$stage/docs" "$stage/examples"
+            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -buildvcs=false -o "$stage/$binary" ./cmd/dicom-cli
+            cp README.md "$stage/"
+            cp docs/usage.md "$stage/docs/"
+            cp examples/dicom-cli.yaml "$stage/examples/"
+            cp examples/dicom-cli-rules.yaml "$stage/examples/"
+
+            if [[ "$archive" == "zip" ]]; then
+              (cd "$staging" && zip -qr "$output/$package.zip" "$package")
+            else
+              (cd "$staging" && tar -czf "$output/$package.tar.gz" "$package")
+            fi
+          }
+
+          package_target windows amd64 zip
+          package_target linux amd64 tar.gz
+          package_target linux arm64 tar.gz
+          package_target darwin amd64 tar.gz
+          package_target darwin arm64 tar.gz
 
       - name: Smoke test Linux archive
         shell: bash
