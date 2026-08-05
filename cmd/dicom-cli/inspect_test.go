@@ -63,14 +63,43 @@ func TestExecuteInspectWritesGroupedDefaultTextSummary(t *testing.T) {
 	}
 	for _, expected := range []string{
 		"[File]\n  Path: ",
+		"[Encoding]\n  Transfer Syntax UID: 1.2.840.10008.1.2.1\n  Transfer Syntax Name: Explicit VR Little Endian\n  VR Encoding: explicit\n  Byte Order: little-endian",
+		"[File Meta]\n  Media Storage SOP Class UID: 1.2.840.10008.5.1.4.1.1.2",
+		"[Equipment]\n  Specific Character Set: ",
 		"[Patient]\n  Name: SYNTHETIC^PATIENT\n  ID: SYNTHETIC\n  Birth Date: 19800102\n  Sex: F",
-		"[Study]\n  Instance UID: 1.2.826.0.1.3680043.10.5432\n  Modality: CT\n  Date: 20260730\n  Time: 123456\n  Accession Number: ACC-001\n  Description: Synthetic CT study",
+		"[Study]\n  Instance UID: 1.2.826.0.1.3680043.10.5432\n  Study ID: \n  Modality: CT\n  Date: 20260730\n  Time: 123456\n  Accession Number: ACC-001\n  Description: Synthetic CT study",
 		"[Series]\n  Instance UID: 1.2.826.0.1.3680043.10.5432.1\n  Number: 7\n  Description: Synthetic axial\n  Body Part: CHEST\n  Laterality: R\n  Protocol: Chest routine",
 		"[Instance]\n  SOP Class UID: 1.2.840.10008.5.1.4.1.1.2\n  SOP Instance UID: ",
 		"[Pixel]\n  Rows: 1\n  Columns: 2\n  Frames: 1\n  Bytes: 4\n  Samples Per Pixel: 1\n  Photometric Interpretation: MONOCHROME2",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("inspect text is missing %q: %s", expected, stdout.String())
+		}
+	}
+}
+
+func TestExecuteInspectAllIncludesFileMetaElements(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, stdout, stderr := testRuntime()
+	if code := Execute([]string{"inspect", "--all", fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("inspect exit code = %d, stderr = %s", code, stderr.String())
+	}
+	for _, expected := range []string{"[File Meta Elements]", "0002,0010 UI", "[Elements]", "0010,0020 LO"} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("inspect --all output is missing %q: %s", expected, stdout.String())
+		}
+	}
+
+	runtime, stdout, stderr = testRuntime()
+	if code := Execute([]string{"inspect", "--all", "--json", fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("inspect JSON exit code = %d, stderr = %s", code, stderr.String())
+	}
+	for _, expected := range []string{"\"source\": \"file_meta\"", "\"source\": \"dataset\""} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("inspect --all JSON is missing %q: %s", expected, stdout.String())
 		}
 	}
 }

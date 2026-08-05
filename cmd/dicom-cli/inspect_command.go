@@ -81,6 +81,31 @@ func renderInspect(report inspect.Report, asJSON bool, localizer i18n.Localizer)
 		fmt.Sprintf("  Path: %s", report.File.Path),
 		fmt.Sprintf("  Transfer Syntax: %s", report.File.TransferSyntax),
 		"",
+		"[Encoding]",
+		fmt.Sprintf("  Transfer Syntax UID: %s", report.Encoding.UID),
+		fmt.Sprintf("  Transfer Syntax Name: %s", report.Encoding.Name),
+		fmt.Sprintf("  VR Encoding: %s", report.Encoding.VREncoding),
+		fmt.Sprintf("  Byte Order: %s", report.Encoding.ByteOrder),
+		fmt.Sprintf("  Encapsulated: %t", report.Encoding.Encapsulated),
+		fmt.Sprintf("  Lossy: %t", report.Encoding.Lossy),
+		fmt.Sprintf("  Lossy Compression Method: %s", report.Encoding.LossyCompressionMethod),
+		fmt.Sprintf("  Deflated: %t", report.Encoding.Deflated),
+		fmt.Sprintf("  Retired: %t", report.Encoding.Retired),
+		"",
+		"[File Meta]",
+		fmt.Sprintf("  Media Storage SOP Class UID: %s", report.FileMeta.MediaStorageSOPClassUID),
+		fmt.Sprintf("  Media Storage SOP Instance UID: %s", report.FileMeta.MediaStorageSOPInstanceUID),
+		fmt.Sprintf("  Implementation Class UID: %s", report.FileMeta.ImplementationClassUID),
+		fmt.Sprintf("  Implementation Version Name: %s", report.FileMeta.ImplementationVersionName),
+		fmt.Sprintf("  Source Application AE Title: %s", report.FileMeta.SourceApplicationAETitle),
+		"",
+		"[Equipment]",
+		fmt.Sprintf("  Specific Character Set: %s", report.Equipment.SpecificCharacterSet),
+		fmt.Sprintf("  Manufacturer: %s", report.Equipment.Manufacturer),
+		fmt.Sprintf("  Model: %s", report.Equipment.Model),
+		fmt.Sprintf("  Station: %s", report.Equipment.Station),
+		fmt.Sprintf("  Software Versions: %s", report.Equipment.SoftwareVersions),
+		"",
 		"[Patient]",
 		fmt.Sprintf("  Name: %s", report.Patient.Name),
 		fmt.Sprintf("  ID: %s", report.Patient.ID),
@@ -89,12 +114,14 @@ func renderInspect(report inspect.Report, asJSON bool, localizer i18n.Localizer)
 		"",
 		"[Study]",
 		fmt.Sprintf("  Instance UID: %s", report.Study.InstanceUID),
+		fmt.Sprintf("  Study ID: %s", report.Study.ID),
 		fmt.Sprintf("  Modality: %s", report.Study.Modality),
 		fmt.Sprintf("  Date: %s", report.Study.Date),
 		fmt.Sprintf("  Time: %s", report.Study.Time),
 		fmt.Sprintf("  Accession Number: %s", report.Study.AccessionNumber),
 		fmt.Sprintf("  Description: %s", report.Study.Description),
 		fmt.Sprintf("  Referring Physician: %s", report.Study.ReferringPhysician),
+		fmt.Sprintf("  Institution: %s", report.Study.Institution),
 		"",
 		"[Series]",
 		fmt.Sprintf("  Instance UID: %s", report.Series.InstanceUID),
@@ -112,6 +139,10 @@ func renderInspect(report inspect.Report, asJSON bool, localizer i18n.Localizer)
 		fmt.Sprintf("  Image Orientation: %s", report.Instance.ImageOrientation),
 		fmt.Sprintf("  Slice Thickness: %s", report.Instance.SliceThickness),
 		fmt.Sprintf("  Spacing Between Slices: %s", report.Instance.SpacingBetweenSlices),
+		fmt.Sprintf("  Image Type: %s", report.Instance.ImageType),
+		fmt.Sprintf("  Content Date: %s", report.Instance.ContentDate),
+		fmt.Sprintf("  Content Time: %s", report.Instance.ContentTime),
+		fmt.Sprintf("  Acquisition Number: %s", report.Instance.AcquisitionNumber),
 		"",
 		"[Pixel]",
 		fmt.Sprintf("  Rows: %d", report.Pixel.Rows),
@@ -127,10 +158,33 @@ func renderInspect(report inspect.Report, asJSON bool, localizer i18n.Localizer)
 		fmt.Sprintf("  Pixel Spacing: %s", report.Pixel.PixelSpacing),
 		fmt.Sprintf("  Window Center: %s", report.Pixel.WindowCenter),
 		fmt.Sprintf("  Window Width: %s", report.Pixel.WindowWidth),
+		fmt.Sprintf("  Planar Configuration: %d", report.Pixel.PlanarConfiguration),
+		fmt.Sprintf("  Pixel Aspect Ratio: %s", report.Pixel.PixelAspectRatio),
+		fmt.Sprintf("  Rescale Intercept: %s", report.Pixel.RescaleIntercept),
+		fmt.Sprintf("  Rescale Slope: %s", report.Pixel.RescaleSlope),
+		fmt.Sprintf("  Rescale Type: %s", report.Pixel.RescaleType),
+		fmt.Sprintf("  VOI LUT Function: %s", report.Pixel.VOILUTFunction),
+		fmt.Sprintf("  Lossy Image Compression: %s", report.Pixel.LossyImageCompression),
+		fmt.Sprintf("  Lossy Image Compression Ratio: %s", report.Pixel.LossyImageCompressionRatio),
+		fmt.Sprintf("  Lossy Image Compression Method: %s", report.Pixel.LossyImageCompressionMethod),
 	}
-	if len(report.Elements) > 0 {
+	var fileMetaElements, datasetElements []inspect.ElementReport
+	for _, elem := range report.Elements {
+		if elem.Source == "file_meta" {
+			fileMetaElements = append(fileMetaElements, elem)
+		} else {
+			datasetElements = append(datasetElements, elem)
+		}
+	}
+	if len(fileMetaElements) > 0 {
+		lines = append(lines, "", "[File Meta Elements]")
+		for _, elem := range fileMetaElements {
+			lines = append(lines, fmt.Sprintf("%s %s %s = %s", elem.Tag, elem.VR, elem.Path, elem.Value))
+		}
+	}
+	if len(datasetElements) > 0 {
 		lines = append(lines, "", "[Elements]")
-		for _, elem := range report.Elements {
+		for _, elem := range datasetElements {
 			lines = append(lines, fmt.Sprintf("%s %s %s = %s", elem.Tag, elem.VR, elem.Path, elem.Value))
 		}
 	}
