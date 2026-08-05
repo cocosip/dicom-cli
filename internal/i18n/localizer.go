@@ -344,6 +344,7 @@ var chineseFlagUsage = map[string]string{
 	"report":            "写入详细 JSON 报告",
 	"retries":           "网络和超时失败的重试次数",
 	"set":               "TagPath=value",
+	"charset-check":     "检测特定字符集与原始文本字节是否不一致",
 	"strict":            "将 warning 视为失败",
 	"tag":               "DICOM 关键字或十六进制 Tag 路径",
 	"target":            "命名 PACS 目标",

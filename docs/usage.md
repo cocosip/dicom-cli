@@ -98,11 +98,18 @@ dicom-cli inspect --all --json --output report.json image.dcm
 dicom-cli validate image.dcm
 dicom-cli validate --strict --json --output validation.json image.dcm
 dicom-cli validate --profile ct-required-identifiers --rules dicom-cli-rules.yaml image.dcm
+dicom-cli validate --charset-check image.dcm
 ```
 
 `validate` 只接受一个 DICOM 文件。它会收集多个独立问题；默认 warning 不改变
 退出码，`--strict` 会将 warning 也按校验失败处理。`--profile` 叠加规则文件的
-命名校验 profile。
+命名校验 profile。`--charset-check` 是可选检测：它比较 `(0008,0005)` Specific
+Character Set 声明与文本元素的原始字节，候选编码为声明值、`ISO_IR 192`（UTF-8）、
+`GB18030` 和 `GBK`。能够确定声明编码无法解码而另一候选可解码时报告 error；声明
+编码仍可解码、但多个文本元素一致地更符合另一候选时报告 warning；ASCII 或多个候选
+同样合理时不报告问题。该命令不会修改 DICOM 文件或自动修正 Character Set，报告只包含
+编码、置信度和 Tag 路径，不包含原始字节或文本值。配合 `--strict` 时，warning 也会以
+退出码 `3` 表示校验失败。
 
 ### edit
 

@@ -18,6 +18,7 @@ func newValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	text := root.localizer.Command("validate")
 	var profile string
 	var strict bool
+	var charsetCheck bool
 	var asJSON bool
 	var destination string
 	command := &cobra.Command{
@@ -52,6 +53,9 @@ func newValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
 			result := validatepkg.Validate(parsed, profiles...)
+			if charsetCheck {
+				result.Issues = append(result.Issues, validatepkg.CheckCharacterSet(parsed.Dataset)...)
+			}
 			content, err := renderValidate(result, asJSON, root.localizer)
 			if err != nil {
 				return err
@@ -65,6 +69,7 @@ func newValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	localizedHelpFlag(command, root.localizer)
 	command.Flags().StringVarP(&profile, "profile", "p", "", root.localizer.FlagUsage("profile", "validate profile from rules"))
 	command.Flags().BoolVar(&strict, "strict", false, root.localizer.FlagUsage("strict", "treat warnings as failures"))
+	command.Flags().BoolVar(&charsetCheck, "charset-check", false, root.localizer.FlagUsage("charset-check", "detect mismatches between Specific Character Set and raw text bytes"))
 	command.Flags().BoolVarP(&asJSON, "json", "j", false, root.localizer.FlagUsage("json", "write JSON"))
 	command.Flags().StringVarP(&destination, "output", "o", "", root.localizer.FlagUsage("output", "report output path"))
 	return command
