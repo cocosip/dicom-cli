@@ -1,6 +1,6 @@
 module github.com/cocosip/dicom-cli
 
-go 1.26
+go 1.27
 
 require (
 	github.com/cocosip/go-dicom v0.7.1
