@@ -69,11 +69,12 @@ dicom-cli echo --config dicom-cli.yaml --target local-pacs
 ### 脱敏目录
 
 ```sh
-dicom-cli anonymize --profile basic --recursive --output anonymized study
+dicom-cli anonymize --recursive --output anonymized study
 ```
 
-源文件不会被改写。目录默认只扫描当前层，使用 `--recursive` 才遍历子目录。默认
-profile 为内置 `basic`；命名 profile、筛选条件和模板来自规则文件。
+源文件不会被改写。目录默认只扫描当前层，使用 `--recursive` 才遍历子目录。命令直接
+使用 go-dicom 内置的 Basic Profile；`--option` 选择该标准 profile 的可选项，不支持
+命名 profile、筛选条件或规则文件。
 
 ### 导出与转码
 
@@ -120,7 +121,7 @@ Get-Content failed-paths.txt | dicom-cli send --target local-pacs -
 | `inspect <file>` | 输出单个文件的摘要、指定标签或完整元素清单。 |
 | `validate <file>` | 执行内置和命名规则 profile 校验。 |
 | `edit <file>` | 写出经标签、UID 或字符集修改的新文件。 |
-| `anonymize <file-or-directory>` | 按内置或命名 profile 脱敏。 |
+| `anonymize <file-or-directory>` | 按 go-dicom 内置 Basic Profile 脱敏。 |
 | `convert image|json|xml|pixeldata --input <path>` | 导出图像帧、元数据或原始 PixelData 字节。 |
 | `encapsulate image <input>` | 将受支持的 PNG/JPEG 写为未压缩 Secondary Capture DICOM。 |
 | `transcode --input <path>` | 将一个 DICOM 文件或一个目录转码至指定传输语法。 |

@@ -79,9 +79,9 @@
 
 ### 6.2 规则文件
 
-默认文件名为 `dicom-cli-rules.yaml`，顶层必须含 `version: v1`。其统一保存 Tag 清单、目录筛选、脱敏 profile、校验 profile 和图片封装 DICOM 模板。查找与覆盖行为同运行配置，但使用 `--rules/-R`。
+默认文件名为 `dicom-cli-rules.yaml`，顶层必须含 `version: v1`。其统一保存 Tag 清单、目录筛选、校验 profile 和图片封装 DICOM 模板。查找与覆盖行为同运行配置，但使用 `--rules/-R`。
 
-提供 `rules init` 和 `rules validate`。规则校验必须验证 schema、命名引用、Tag 路径、动作、参数类型和同一脱敏 profile 中的重复 Tag 动作。规则表达式统一使用 Tag 路径及条件 DSL，支持存在性、精确相等、正则、数值范围、`and` 和 `or`。
+提供 `rules init` 和 `rules validate`。规则校验必须验证 schema、命名引用、Tag 路径、动作和参数类型。规则表达式统一使用 Tag 路径及条件 DSL，支持存在性、精确相等、正则、数值范围、`and` 和 `or`。
 
 ## 7. 本地 DICOM 功能
 
@@ -97,7 +97,7 @@
 
 ### 7.3 anonymize
 
-未指定 `--profile/-p` 时使用内置 DICOM Basic Application Level Confidentiality Profile；可通过该选项选择其他命名 profile，并通过 `--option` 选择标准可选项。规则文件路径使用 `--rules/-R` 指定，外部 profile 在内置 Basic 规则之上叠加；若外部 profile 也命名为 `basic`，必须同时显式传入 `--rules` 与 `--profile basic`。动作仅限删除、清空、固定替换和 UID 重映射；私有 Tag 默认保留。
+`anonymize` 直接使用 go-dicom 内置 DICOM Basic Application Level Confidentiality Profile；`--option` 选择标准可选项。该命令不接受 `--rules`、`--profile` 或 `--filter`，不提供自定义规则叠加；所有 Tag 处理均以 go-dicom 的 profile 实现为准。
 
 UID 映射仅作用于一次命令调用的全部输入：相同原 UID 始终映射为相同新 UID，不同原 UID 映射为不同新 UID，映射不跨调用持久化。默认报告不得包含敏感原值；只有 `--report <file>` 才可输出完整 Tag 前后值和 UID 映射。
 

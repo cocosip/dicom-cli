@@ -23,7 +23,7 @@ func TestRulesInitGeneratesAndValidatesYAMLAndJSON(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range []string{"ct-images", "summary", "basic", "ct-required-identifiers", "secondary-capture"} {
+			for _, want := range []string{"ct-images", "summary", "ct-required-identifiers", "secondary-capture"} {
 				if !bytes.Contains(content, []byte(want)) {
 					t.Fatalf("generated %s does not contain starter rule %q: %s", test.name, want, content)
 				}

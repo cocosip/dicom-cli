@@ -76,9 +76,9 @@ func TestSendReadsStdinAndRollsAssociationsAtConfiguredMaximum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := []string{"send", "-", "--host", "127.0.0.1", "--port", stringPort(port), "--calling-ae", "DICOMCLI", "--called-ae", "LOCAL_SCP"}
+	args := []string{"send", "-", "--json", "--host", "127.0.0.1", "--port", stringPort(port), "--calling-ae", "DICOMCLI", "--called-ae", "LOCAL_SCP"}
 	stdin := fixtures.SingleFrame + "\n" + fixtures.MultiFrame + "\n"
-	if output, err := runCLIWithInput(root, stdin, args...); err != nil || !strings.Contains(output, "processed=2") {
+	if output, err := runCLIWithInput(root, stdin, args...); err != nil || !strings.Contains(output, `"processed":2`) {
 		t.Fatalf("send stdin output=%q err=%v", output, err)
 	}
 	waitForCount(t, &closed, 1)
@@ -86,7 +86,7 @@ func TestSendReadsStdinAndRollsAssociationsAtConfiguredMaximum(t *testing.T) {
 		t.Fatalf("C-STORE calls = %d, want 2", got)
 	}
 
-	if output, err := runCLIWithInput(root, stdin, append(args, "--max-instances", "1")...); err != nil || !strings.Contains(output, "processed=2") {
+	if output, err := runCLIWithInput(root, stdin, append(args, "--max-instances", "1")...); err != nil || !strings.Contains(output, `"processed":2`) {
 		t.Fatalf("send max-instances output=%q err=%v", output, err)
 	}
 	waitForCount(t, &closed, 3)
@@ -120,8 +120,8 @@ func TestSendDoesNotRetryPACSStatusAndReusesFailedListAsStdin(t *testing.T) {
 	reportPath := filepath.Join(t.TempDir(), "send-report.json")
 	failedListPath := filepath.Join(t.TempDir(), "failed.txt")
 	targetArgs := []string{"--host", "127.0.0.1", "--port", stringPort(port), "--calling-ae", "DICOMCLI", "--called-ae", "LOCAL_SCP"}
-	args := append([]string{"send", fixtures.SingleFrame, "--retries", "3", "--report", reportPath, "--failed-list", failedListPath}, targetArgs...)
-	if output, err := runCLI(root, args...); err == nil || !strings.Contains(output, "failed=1") {
+	args := append([]string{"send", fixtures.SingleFrame, "--json", "--retries", "3", "--report", reportPath, "--failed-list", failedListPath}, targetArgs...)
+	if output, err := runCLI(root, args...); err == nil || !strings.Contains(output, `"failed":1`) {
 		t.Fatalf("failed send output=%q err=%v", output, err)
 	}
 	report, err := os.ReadFile(reportPath)
@@ -140,7 +140,7 @@ func TestSendDoesNotRetryPACSStatusAndReusesFailedListAsStdin(t *testing.T) {
 	}
 
 	reject.Store(false)
-	if output, err := runCLIWithInput(root, string(failedList), append([]string{"send", "-"}, targetArgs...)...); err != nil || !strings.Contains(output, "processed=1") {
+	if output, err := runCLIWithInput(root, string(failedList), append([]string{"send", "-", "--json"}, targetArgs...)...); err != nil || !strings.Contains(output, `"processed":1`) {
 		t.Fatalf("retry from stdin output=%q err=%v", output, err)
 	}
 }
@@ -172,9 +172,9 @@ func TestSendHonorsAssociationConcurrencyLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := []string{"send", "-", "--max-instances", "1", "--concurrency", "2", "--host", "127.0.0.1", "--port", stringPort(port), "--calling-ae", "DICOMCLI", "--called-ae", "LOCAL_SCP"}
+	args := []string{"send", "-", "--json", "--max-instances", "1", "--concurrency", "2", "--host", "127.0.0.1", "--port", stringPort(port), "--calling-ae", "DICOMCLI", "--called-ae", "LOCAL_SCP"}
 	input := fixtures.SingleFrame + "\n" + fixtures.MultiFrame + "\n"
-	if output, err := runCLIWithInput(root, input, args...); err != nil || !strings.Contains(output, "processed=2") {
+	if output, err := runCLIWithInput(root, input, args...); err != nil || !strings.Contains(output, `"processed":2`) {
 		t.Fatalf("concurrent send output=%q err=%v", output, err)
 	}
 	if got := maximum.Load(); got != 2 {

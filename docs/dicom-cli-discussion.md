@@ -10,7 +10,7 @@
 
 - `inspect`：查看患者、检查、序列、实例、空间定位与像素技术参数摘要，或按选项查看标签和完整数据集。
 - `validate`：检查文件完整性、传输语法与基础一致性。
-- `anonymize`：按预设或规则脱敏并生成处理结果。
+- `anonymize`：按 go-dicom 内置 Basic Profile 脱敏并生成处理结果。
 - `edit`：按命令行参数对单个 DICOM 文件的 Tag 执行设置/替换、清空、删除，以及序列内嵌套 Tag 修改，并生成新文件。
 
 嵌套 Tag 路径同时支持关键字和十六进制写法，序列项用 `[索引]` 选择，例如 `ContentSequence[0].TextValue` 或 `0040,A730[0].0040,A160`。
@@ -39,13 +39,13 @@ UID 自动生成默认使用 `2.25.<UUID 对应十进制整数>` 形式；配置
 
 运行配置支持 YAML 与 JSON，按文件扩展名识别格式，仅定义命名 PACS 目标、UID 根和运行参数。
 
-规则文件与运行配置分离，集中定义标签清单、目录筛选、脱敏规则、校验规则和图片封装模板。`inspect` 与 `validate` 可使用规则文件中的默认 profile；`anonymize` 未指定 `--profile/-p` 时使用内置 Basic profile。外部命名 profile 通过 `--rules/-R <文件>` 和 `--profile/-p <名称>` 选择，并在内置 Basic 规则之上叠加；外部同名 `basic` profile 必须显式指定规则文件。
+规则文件与运行配置分离，集中定义标签清单、目录筛选、校验规则和图片封装模板。`inspect` 与 `validate` 可使用规则文件中的命名 profile；`anonymize` 始终使用 go-dicom 内置 Basic Profile，不读取规则文件。
 
-`anonymize`、`convert`、`transcode` 和 `send` 的目录模式支持从规则文件中选择命名的 DICOM Tag 筛选条件；筛选支持 Tag 存在性、精确值、正则、数值范围及 `and` / `or` 组合。筛选只决定目录中的哪些文件进入处理，单文件命令不提供此能力。
+`convert`、`transcode` 和 `send` 的目录模式支持从规则文件中选择命名的 DICOM Tag 筛选条件；筛选支持 Tag 存在性、精确值、正则、数值范围及 `and` / `or` 组合。筛选只决定目录中的哪些文件进入处理，单文件命令不提供此能力。
 
 规则文件可在顶层定义可复用的命名 `filters`，目录命令的 profile 也可内嵌专用筛选条件。
 
-规则文件中的目录筛选、脱敏 profile 和自定义校验共用同一套 Tag 路径与条件表达式，避免用户学习多种规则写法。
+规则文件中的目录筛选和自定义校验共用同一套 Tag 路径与条件表达式，避免用户学习多种规则写法。
 
 配置可通过 `--config <文件>` 显式指定；未指定时，优先使用当前目录的 `dicom-cli.yaml`，仅当其不存在才回退到 Windows 或 Linux 用户级系统配置目录中的同名文件；两层文件不合并。
 
@@ -112,8 +112,6 @@ version: v1
 filters:                     # 可复用的目录筛选条件
 inspect:
   profiles:                  # 命名标签清单
-anonymize:
-  profiles:                  # 命名脱敏规则，可引用或内嵌目录筛选
 validate:
   profiles:                  # 命名校验规则
 dicom_templates:             # 图片封装 DICOM 的元数据模板
@@ -132,19 +130,6 @@ filters:
     all:
       - path: Modality
         equals: CT
-
-anonymize:
-  profiles:
-    default:
-      filter: ct-only
-      rules:
-        - path: PatientName
-          action: replace
-          value: ANON
-        - path: PatientID
-          action: clear
-        - path: StudyInstanceUID
-          action: remap_uid
 
 validate:
   profiles:
@@ -182,16 +167,11 @@ dicom_templates:
 ## 脱敏规则
 
 - 统一规则文件带顶层 schema 版本字段，例如 `version: v1`。
-- 提供 DICOM Basic Application Level Confidentiality Profile 及其标准可选项作为内置命名预设；统一规则文件中的显式 Tag 规则在预设之上叠加。
-- UID 是否重生成由命令参数或规则显式控制，不作为固定默认行为。
-- 脱敏动作仅包括删除、清空、固定替换和 UID 重映射。
-- 启用 UID 重生成时，每次 `anonymize` 调用创建新的 UID 映射表。
-- 映射表的作用域覆盖该次调用的全部输入：同一检查的 `StudyInstanceUID`、同一序列的 `SeriesInstanceUID`、对象引用中的 UID 必须映射为一致的新值。
-- 不同的原 Study、Series 或 SOP UID 必须映射为不同的新 UID，不能将目录内多个原始组强制合并。
-- 不同调用之间不复用映射，因此再次脱敏同一份输入会产生新的 UID 集合。
-- 私有标签默认保留；内置预设或用户 YAML/JSON 规则决定特定标签的删除、清空、替换或保留。
+- `anonymize` 直接调用 go-dicom 的 DICOM Basic Application Level Confidentiality Profile；它不是命名预设，且不读取规则文件。
+- `--option` 仅选择 go-dicom 暴露的标准 profile 可选项；命令不定义或叠加 Tag 动作。
+- 每次调用创建一个 go-dicom anonymizer，复用其 UID 映射表以保持该批处理内由 profile 处理的 UID 一致；映射不跨调用持久化。
+- 私有标签及其他 Tag 的处理完全由 go-dicom profile 决定。
 - 默认报告只输出不含敏感原值的摘要。显式指定 `--report <文件>` 时，报告记录每个处理 Tag 的原值、新值和完整 UID 映射。完整报告属于高度敏感数据，必须作为受控文件单独输出，不能混入普通控制台日志。
-- `rules validate` 拒绝同一脱敏 profile 对同一 Tag 路径定义多条动作。
 
 ## 转换范围
 

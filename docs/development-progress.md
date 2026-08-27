@@ -26,9 +26,9 @@
 - [x] **P1.3 实现配置优先级**：依赖 P1.2；完成条件：命令行、`DICOM_CLI_*`、配置和默认值的冲突优先级均有测试。
 - [x] **P1.4 实现 config init/validate**：依赖 P1.1-P1.3；完成条件：YAML/JSON 示例均可生成和校验，既有文件无 `--force` 时被拒绝覆盖。
 - [x] **P1.5 实现命名 PACS 目标 CRUD**：依赖 P1.4；完成条件：`config target list|add|update|remove` 的临时配置集成测试通过。
-- [x] **P1.6 定义规则文件 v1 模型**：依赖 P0.1；完成条件：统一保存筛选、inspect、anonymize、validate 与 DICOM 模板，未知字段被严格拒绝。
+- [x] **P1.6 定义规则文件 v1 模型**：依赖 P0.1；完成条件：统一保存筛选、inspect、validate 与 DICOM 模板，未知字段被严格拒绝。
 - [x] **P1.7 实现条件 DSL**：依赖 P1.6；完成条件：Tag 路径、存在性、相等、正则、数值范围、`all`、`any` 分别有单元测试。
-- [x] **P1.8 实现规则静态校验**：依赖 P1.6、P1.7；完成条件：命名引用、Tag 路径、动作参数、重复脱敏动作都校验，坏文件可一次列出全部问题。
+- [x] **P1.8 实现规则静态校验**：依赖 P1.6、P1.7；完成条件：命名引用、Tag 路径和校验规则参数都校验，坏文件可一次列出全部问题。
 - [x] **P1.9 实现 rules init/validate**：依赖 P1.8；完成条件：YAML/JSON 示例生成后均通过 `rules validate`。
 - [x] **P1.10 验收 P1**：依赖 P1.1-P1.9；完成条件：`go test ./internal/config ./internal/rules ./cmd/dicom-cli` 成功。
 
@@ -63,12 +63,12 @@
 
 ## P4 脱敏
 
-- [x] **P4.1 定义内置脱敏 profile**：依赖 P1.6、P2.3；完成条件：实现 DICOM Basic Application Level Confidentiality Profile 及标准可选项，并有规则单元测试。
-- [x] **P4.2 实现 profile 叠加与四类动作**：依赖 P4.1、P1.8；完成条件：外部规则叠加、delete、clear、replace、remap_uid 均有覆盖顺序测试。
-- [x] **P4.3 接入批次 UID 映射**：依赖 P2.6、P4.2；完成条件：一次 anonymize 调用内多文件 Study/Series/SOP 与引用 UID 映射一致。
-- [x] **P4.4 实现脱敏报告边界**：依赖 P4.2、P2.9；完成条件：默认摘要不含敏感原值，`--report` 文件才包含前后值和 UID 映射。
-- [x] **P4.5 完成 anonymize 批处理**：依赖 P2.7-P2.10、P4.2；完成条件：文件/目录、筛选、递归、fail-fast、私有 Tag 默认保留、输出树与源文件不变均通过集成测试。
-- [x] **P4.6 验收 P4 合成样本**：依赖 P4.1-P4.5；完成条件：`go test ./internal/anonymize ./internal/app ./cmd/dicom-cli -run Anonymize` 成功。
+- [x] **P4.1 接入 go-dicom 内置脱敏 profile**：依赖 P2.3；完成条件：直接执行 DICOM Basic Application Level Confidentiality Profile 及标准可选项。
+- [x] **P4.2 移除自定义匿名化规则叠加**：依赖 P4.1；完成条件：不接受规则文件、命名 profile、筛选或自定义动作。
+- [x] **P4.3 接入批次 UID 映射**：依赖 P2.6、P4.1；完成条件：一次 anonymize 调用复用 go-dicom anonymizer 的 UID 映射。
+- [x] **P4.4 实现脱敏报告边界**：依赖 P4.1、P2.9；完成条件：默认摘要不含敏感原值，`--report` 文件才包含前后值和 UID 映射。
+- [x] **P4.5 完成 anonymize 批处理**：依赖 P2.7-P2.10、P4.1；完成条件：文件/目录、递归、fail-fast、输出树与源文件不变均通过集成测试。
+- [x] **P4.6 验收 P4 合成样本**：依赖 P4.1-P4.5；完成条件：`go test ./internal/app ./cmd/dicom-cli ./tests/integration -run Anonymize` 成功，并以 go-dicom 内置 Basic Profile 的实际结果作为断言基准。
 - [ ] **P4.7 脱敏真实样本回归**：依赖 P4.6；阻塞原因：等待提供可合法用于测试的脱敏真实 DICOM 样本，路径不得写死。
 
 ## P5 转换与传输语法转码

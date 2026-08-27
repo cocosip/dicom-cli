@@ -1,4 +1,4 @@
-# Copy this file to dicom-cli-rules.yaml. Use --rules <path> --profile <name> to apply a named profile.
+# Copy this file to dicom-cli-rules.yaml. Use --rules <path> with commands that support rule profiles or filters.
 version: v1
 
 filters:
@@ -19,21 +19,6 @@ inspect:
         - SeriesInstanceUID
         - SOPInstanceUID
         - 0040,A730[0].0040,A160
-
-anonymize:
-  profiles:
-    basic:
-      filter: ct-images
-      rules:
-        - path: PatientName
-          action: replace
-          value: ANON^PATIENT
-        - path: PatientID
-          action: clear
-        - path: AccessionNumber
-          action: delete
-        - path: StudyInstanceUID
-          action: remap_uid
 
 validate:
   profiles:

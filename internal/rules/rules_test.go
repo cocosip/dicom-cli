@@ -32,34 +32,15 @@ func TestValidateAggregatesStaticRuleErrors(t *testing.T) {
 		Filters: map[string]Condition{
 			"bad": {Path: "not a path", Matches: "["},
 		},
-		Anonymize: AnonymizeSection{Profiles: map[string]AnonymizeProfile{
-			"default": {Filter: "missing", Rules: []AnonymizeRule{
-				{Path: "PatientName", Action: "replace"},
-				{Path: "PatientName", Action: "clear"},
-				{Path: "PatientID", Action: "unknown"},
-			}},
-		}},
 	}
 	err := file.Validate()
 	if err == nil {
 		t.Fatal("Validate() error = nil, want aggregated validation errors")
 	}
-	for _, want := range []string{"version", "not a path", "regular expression", "missing", "value", "duplicate", "unknown"} {
+	for _, want := range []string{"version", "not a path", "regular expression"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("Validate() error = %q, want %q", err, want)
 		}
-	}
-}
-
-func TestValidateAcceptsAnonymizeProfileOptions(t *testing.T) {
-	file := File{
-		Version: VersionV1,
-		Anonymize: AnonymizeSection{Profiles: map[string]AnonymizeProfile{
-			"research": {Options: []string{"retain-uids", "retain-longitudinal-temporal-information-with-full-dates"}},
-		}},
-	}
-	if err := file.Validate(); err != nil {
-		t.Fatalf("Validate() error = %v", err)
 	}
 }
 

@@ -6,18 +6,16 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
+	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 
-	anonymizepkg "github.com/cocosip/dicom-cli/internal/anonymize"
 	"github.com/cocosip/dicom-cli/internal/app"
 	"github.com/cocosip/dicom-cli/internal/apperr"
-	"github.com/cocosip/dicom-cli/internal/dicom"
 	"github.com/cocosip/dicom-cli/internal/files"
 	"github.com/cocosip/dicom-cli/internal/i18n"
-	"github.com/cocosip/dicom-cli/internal/rules"
+	goanonymizer "github.com/cocosip/go-dicom/pkg/dicom/anonymizer"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
@@ -38,14 +36,20 @@ type anonymizeReport struct {
 }
 
 type anonymizeFileReport struct {
-	Input   string                `json:"input"`
-	Output  string                `json:"output"`
-	Changes []anonymizepkg.Change `json:"changes"`
+	Input   string            `json:"input"`
+	Output  string            `json:"output"`
+	Changes []anonymizeChange `json:"changes"`
+}
+
+type anonymizeChange struct {
+	Path   string `json:"path"`
+	Before string `json:"before"`
+	After  string `json:"after"`
 }
 
 func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	text := root.localizer.Command("anonymize")
-	var profile, destination, reportPath, filter string
+	var destination, reportPath string
 	var profileOptions []string
 	var recursive, failFast, flatten, asJSON bool
 	command := &cobra.Command{
@@ -53,18 +57,17 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Short: text.Short,
 		Long:  text.Long,
 		Example: "  dicom-cli anonymize --output anonymized image.dcm\n" +
-			"  dicom-cli anonymize --profile research --rules dicom-cli-rules.yaml --recursive --output anonymized study",
+			"  dicom-cli anonymize --option retain-uids --recursive --output anonymized study",
 		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
-			selected, condition, err := loadAnonymizeProfile(runtime, root.rulesPath, profile, filter, command.Flags().Changed("profile") && root.rulesPath != "")
+			if root.rulesPath != "" {
+				return apperr.Wrap(apperr.KindInput, fmt.Errorf("anonymize does not support --rules"))
+			}
+			options, err := parseAnonymizeProfileOptions(profileOptions)
 			if err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
-			profileOptions = append(profileOptions, selected.Options...)
-			engine, err := anonymizepkg.NewEngine(anonymizepkg.Options{ProfileOptions: profileOptions, Rules: selected.Rules})
-			if err != nil {
-				return apperr.Wrap(apperr.KindInput, err)
-			}
+			anonymizer := goanonymizer.NewAnonymizer(goanonymizer.NewSecurityProfile(goanonymizer.BasicProfile | options))
 			input := args[0]
 			info, err := os.Stat(input)
 			if err != nil {
@@ -84,19 +87,7 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			entries, err := files.Scan(input, recursive, func(path string) (bool, string, error) {
-				if condition == nil {
-					return true, "", nil
-				}
-				parsed, parseErr := parser.ParseFile(path)
-				if parseErr != nil {
-					return true, "", nil
-				}
-				if matchCondition(parsed.Dataset, *condition) {
-					return true, "", nil
-				}
-				return false, "filter did not match", nil
-			})
+			entries, err := files.Scan(input, recursive, func(string) (bool, string, error) { return true, "", nil })
 			if err != nil {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
@@ -109,13 +100,14 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				result, err := engine.Anonymize(parsed.Dataset)
+				before := anonymizeSnapshot(parsed.Dataset)
+				anonymized, err := anonymizer.Anonymize(parsed.Dataset)
 				if err != nil {
 					return err
 				}
 				outputPath := "-"
 				if destination == "-" {
-					if err := writer.Write(runtime.Stdout, result.Dataset, writer.WithTransferSyntax(parsed.TransferSyntax)); err != nil {
+					if err := writer.Write(runtime.Stdout, anonymized, writer.WithTransferSyntax(parsed.TransferSyntax)); err != nil {
 						return err
 					}
 				} else {
@@ -130,14 +122,14 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 					if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 						return err
 					}
-					if err := writer.WriteFile(outputPath, result.Dataset, writer.WithTransferSyntax(parsed.TransferSyntax)); err != nil {
+					if err := writer.WriteFile(outputPath, anonymized, writer.WithTransferSyntax(parsed.TransferSyntax)); err != nil {
 						return err
 					}
 				}
-				report.Files = append(report.Files, anonymizeFileReport{Input: path, Output: outputPath, Changes: result.Changes})
+				report.Files = append(report.Files, anonymizeFileReport{Input: path, Output: outputPath, Changes: anonymizeChanges(before, anonymizeSnapshot(anonymized))})
 				return nil
 			})
-			report.UIDMappings = engine.UIDMappings()
+			report.UIDMappings = cloneAnonymizeUIDMappings(anonymizer.ReplacedUIDs)
 			if reportPath != "" {
 				content, err := json.MarshalIndent(report, "", "  ")
 				if err != nil {
@@ -162,9 +154,7 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		},
 	}
 	localizedHelpFlag(command, root.localizer)
-	command.Flags().StringVarP(&profile, "profile", "p", "basic", root.localizer.FlagUsage("profile", "rules anonymize profile; defaults to built-in basic"))
 	command.Flags().StringArrayVar(&profileOptions, "option", nil, root.localizer.FlagUsage("option", "standard anonymize profile option"))
-	command.Flags().StringVar(&filter, "filter", "", root.localizer.FlagUsage("filter", "named rules filter"))
 	command.Flags().BoolVarP(&recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
 	command.Flags().BoolVar(&failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
 	command.Flags().BoolVar(&flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
@@ -172,40 +162,6 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	command.Flags().BoolVarP(&asJSON, "json", "j", false, root.localizer.FlagUsage("json", "write JSON summary"))
 	command.Flags().StringVar(&reportPath, "report", "", root.localizer.FlagUsage("report", "write detailed sensitive report to file"))
 	return command
-}
-
-func loadAnonymizeProfile(runtime Runtime, configuredPath, name, requestedFilter string, loadExternalBasic bool) (rules.AnonymizeProfile, *rules.Condition, error) {
-	profile := rules.AnonymizeProfile{}
-	if name == "basic" && requestedFilter == "" && !loadExternalBasic {
-		return profile, nil, nil
-	}
-	path, err := rulesPath(runtime, configuredPath, nil)
-	if err != nil {
-		return rules.AnonymizeProfile{}, nil, err
-	}
-	file, err := rules.Load(path)
-	if err != nil {
-		return rules.AnonymizeProfile{}, nil, err
-	}
-	if name != "basic" || loadExternalBasic {
-		var ok bool
-		profile, ok = file.Anonymize.Profiles[name]
-		if !ok {
-			return rules.AnonymizeProfile{}, nil, fmt.Errorf("anonymize profile %q does not exist", name)
-		}
-	}
-	filterName := requestedFilter
-	if filterName == "" {
-		filterName = profile.Filter
-	}
-	if filterName == "" {
-		return profile, nil, nil
-	}
-	condition, ok := file.Filters[filterName]
-	if !ok {
-		return rules.AnonymizeProfile{}, nil, fmt.Errorf("anonymize filter %q does not exist", filterName)
-	}
-	return profile, &condition, nil
 }
 
 func anonymizeOutputRoot(runtime Runtime, input, destination string) (string, error) {
@@ -276,48 +232,84 @@ func writeAnonymizeReport(path string, content []byte) error {
 	return os.WriteFile(path, content, 0o600)
 }
 
-func matchCondition(ds *dataset.Dataset, condition rules.Condition) bool {
-	if len(condition.All) > 0 {
-		for _, child := range condition.All {
-			if !matchCondition(ds, child) {
-				return false
-			}
-		}
-		return true
-	}
-	if len(condition.Any) > 0 {
-		for _, child := range condition.Any {
-			if matchCondition(ds, child) {
-				return true
-			}
-		}
-		return false
-	}
-	elem, err := dicom.ResolveElement(ds, condition.Path)
-	if condition.Exists != nil {
-		return err == nil == *condition.Exists
-	}
-	if err != nil {
-		return false
-	}
-	value := elementValue(elem)
-	if condition.Equals != nil {
-		return value == *condition.Equals
-	}
-	if condition.Matches != "" {
-		matched, compileErr := regexp.MatchString(condition.Matches, value)
-		return compileErr == nil && matched
-	}
-	if condition.Range != nil {
-		number, parseErr := strconv.ParseFloat(value, 64)
-		return parseErr == nil && (condition.Range.Min == nil || number >= *condition.Range.Min) && (condition.Range.Max == nil || number <= *condition.Range.Max)
-	}
-	return false
+var anonymizeProfileOptions = map[string]goanonymizer.SecurityProfileOptions{
+	"retain-safe-private":                                          goanonymizer.RetainSafePrivate,
+	"retain-uids":                                                  goanonymizer.RetainUIDs,
+	"retain-device-identity":                                       goanonymizer.RetainDeviceIdent,
+	"retain-institution-identity":                                  goanonymizer.RetainInstitutionIdent,
+	"retain-patient-characteristics":                               goanonymizer.RetainPatientChars,
+	"retain-longitudinal-temporal-information-with-full-dates":     goanonymizer.RetainLongFullDates,
+	"retain-longitudinal-temporal-information-with-modified-dates": goanonymizer.RetainLongModifDates,
+	"clean-descriptors":                                            goanonymizer.CleanDesc,
+	"clean-structured-content":                                     goanonymizer.CleanStructdCont,
+	"clean-graphics":                                               goanonymizer.CleanGraph,
 }
 
-func elementValue(elem element.Element) string {
-	if value, ok := elem.(*element.String); ok {
-		return value.GetString()
+func parseAnonymizeProfileOptions(names []string) (goanonymizer.SecurityProfileOptions, error) {
+	var selected goanonymizer.SecurityProfileOptions
+	for _, name := range names {
+		option, ok := anonymizeProfileOptions[name]
+		if !ok {
+			return 0, fmt.Errorf("unsupported anonymize profile option %q", name)
+		}
+		selected |= option
 	}
-	return elem.String()
+	return selected, nil
+}
+
+func anonymizeSnapshot(ds *dataset.Dataset) map[string]string {
+	values := map[string]string{}
+	collectAnonymizeValues(ds, "", values)
+	return values
+}
+
+func collectAnonymizeValues(ds *dataset.Dataset, prefix string, values map[string]string) {
+	for _, elem := range ds.Elements() {
+		path := elem.Tag().String()
+		if prefix != "" {
+			path = prefix + "." + path
+		}
+		if sequence, ok := elem.(*dataset.Sequence); ok {
+			values[path] = "sequence"
+			for index := 0; index < sequence.Count(); index++ {
+				collectAnonymizeValues(sequence.GetItem(index), fmt.Sprintf("%s[%d]", path, index), values)
+			}
+			continue
+		}
+		if stringElement, ok := elem.(*element.String); ok {
+			values[path] = strings.Join(stringElement.GetValues(), "\\")
+			continue
+		}
+		values[path] = fmt.Sprint(elem)
+	}
+}
+
+func anonymizeChanges(before, after map[string]string) []anonymizeChange {
+	keys := map[string]bool{}
+	for key := range before {
+		keys[key] = true
+	}
+	for key := range after {
+		keys[key] = true
+	}
+	paths := make([]string, 0, len(keys))
+	for path := range keys {
+		if before[path] != after[path] {
+			paths = append(paths, path)
+		}
+	}
+	sort.Strings(paths)
+	result := make([]anonymizeChange, 0, len(paths))
+	for _, path := range paths {
+		result = append(result, anonymizeChange{Path: path, Before: before[path], After: after[path]})
+	}
+	return result
+}
+
+func cloneAnonymizeUIDMappings(values map[string]string) map[string]string {
+	result := make(map[string]string, len(values))
+	for original, replacement := range values {
+		result[original] = replacement
+	}
+	return result
 }

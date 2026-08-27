@@ -73,8 +73,8 @@ dicom-cli config target remove local-pacs
 `rules init [path]` 和 `rules validate [path]` 的覆盖与格式行为和 `config` 相同。
 未传路径时，规则文件按 `--rules`、`DICOM_CLI_RULES`、当前目录
 `dicom-cli-rules.yaml`、用户配置目录 `dicom-cli-rules.yaml` 的顺序查找。
-规则文件包含 `filters`、`inspect.profiles`、`anonymize.profiles`、
-`validate.profiles` 与 `dicom_templates`；未知字段会被拒绝。完整示例见
+规则文件包含 `filters`、`inspect.profiles`、`validate.profiles` 与
+`dicom_templates`；未知字段会被拒绝。完整示例见
 [`examples/dicom-cli-rules.yaml`](../examples/dicom-cli-rules.yaml)。
 
 ## inspect、validate 与 edit
@@ -136,14 +136,13 @@ dicom-cli edit D:\11.dcm --set "0008,1030=Study Description" --set 01f1,104e=xx
 ## anonymize
 
 ```sh
-dicom-cli anonymize --profile basic --output anonymized image.dcm
-dicom-cli anonymize --profile research --rules dicom-cli-rules.yaml --output anonymized study
-dicom-cli anonymize --profile basic --recursive --filter ct-images --output anonymized study
+dicom-cli anonymize --output anonymized image.dcm
+dicom-cli anonymize --option retain-uids --recursive --output anonymized study
 ```
 
 `anonymize` 接受单文件或目录，目录默认只扫描当前层，`--recursive` 才进入子目录。
-默认使用内置 `basic` profile；`--profile` 可选规则文件中的命名 profile，
-`--option` 可重复指定标准 profile 选项。支持的选项为：
+`anonymize` 始终使用 go-dicom 内置 Basic Application Level Confidentiality
+Profile；`--option` 可重复指定标准 profile 选项。支持的选项为：
 
 - `retain-safe-private`
 - `retain-uids`
@@ -156,9 +155,9 @@ dicom-cli anonymize --profile basic --recursive --filter ct-images --output anon
 - `clean-structured-content`
 - `clean-graphics`
 
-目录输出默认保留输入相对层级；`--flatten` 改为平铺并自动处理重名。`--filter` 从规则
-文件选择命名筛选条件，可用于单文件和目录输入。`--fail-fast` 在首个文件失败时停止，
-默认继续处理其余文件。未传 `--output` 时，结果写入当前目录下的 `anonymize` 子目录。
+目录输出默认保留输入相对层级；`--flatten` 改为平铺并自动处理重名。`--fail-fast` 在首个
+文件失败时停止，默认继续处理其余文件。未传 `--output` 时，结果写入当前目录下的
+`anonymize` 子目录。
 `--report` 写出可能包含敏感前后值和 UID 映射的详细报告，应妥善保护；`--json`
 只输出汇总。单文件可以用 `--output -` 将二进制 DICOM 写到 stdout，多个二进制结果
 不能写到 stdout。
@@ -302,8 +301,8 @@ dicom-cli completion powershell > dicom-cli-completion.ps1
 
 ## 批处理、输出与退出码
 
-`anonymize`、`convert`、`transcode` 和目录模式 `send` 中，规则筛选不匹配的文件为
-正常跳过。目录扫描会依命令的输入限制跳过不适用的扩展名；被选中但无法解析或处理
+`convert`、`transcode` 和目录模式 `send` 中，规则筛选不匹配的文件为正常跳过。
+`anonymize` 不读取规则文件或筛选条件。目录扫描会依命令的输入限制跳过不适用的扩展名；被选中但无法解析或处理
 的文件计为失败。默认批处理继续处理剩余文件，`--fail-fast` 会在首个失败后停止。
 
 输出安全边界如下：

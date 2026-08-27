@@ -21,7 +21,6 @@ type File struct {
 	Version        string                   `json:"version" yaml:"version"`
 	Filters        map[string]Condition     `json:"filters,omitempty" yaml:"filters,omitempty"`
 	Inspect        InspectSection           `json:"inspect,omitempty" yaml:"inspect,omitempty"`
-	Anonymize      AnonymizeSection         `json:"anonymize,omitempty" yaml:"anonymize,omitempty"`
 	ValidateRules  ValidateSection          `json:"validate,omitempty" yaml:"validate,omitempty"`
 	DICOMTemplates map[string]DICOMTemplate `json:"dicom_templates,omitempty" yaml:"dicom_templates,omitempty"`
 }
@@ -31,19 +30,6 @@ type InspectSection struct {
 }
 type InspectProfile struct {
 	Tags []string `json:"tags" yaml:"tags"`
-}
-type AnonymizeSection struct {
-	Profiles map[string]AnonymizeProfile `json:"profiles,omitempty" yaml:"profiles,omitempty"`
-}
-type AnonymizeProfile struct {
-	Filter  string          `json:"filter,omitempty" yaml:"filter,omitempty"`
-	Options []string        `json:"options,omitempty" yaml:"options,omitempty"`
-	Rules   []AnonymizeRule `json:"rules" yaml:"rules"`
-}
-type AnonymizeRule struct {
-	Path   string  `json:"path" yaml:"path"`
-	Action string  `json:"action" yaml:"action"`
-	Value  *string `json:"value,omitempty" yaml:"value,omitempty"`
 }
 type ValidateSection struct {
 	Profiles map[string]ValidateProfile `json:"profiles,omitempty" yaml:"profiles,omitempty"`
@@ -134,17 +120,6 @@ func defaultExampleFile() File {
 		Inspect: InspectSection{Profiles: map[string]InspectProfile{
 			"summary": {Tags: []string{"PatientName", "PatientID", "StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID", "0040,A730[0].0040,A160"}},
 		}},
-		Anonymize: AnonymizeSection{Profiles: map[string]AnonymizeProfile{
-			"basic": {
-				Filter: "ct-images",
-				Rules: []AnonymizeRule{
-					{Path: "PatientName", Action: "replace", Value: &patientName},
-					{Path: "PatientID", Action: "clear"},
-					{Path: "AccessionNumber", Action: "delete"},
-					{Path: "StudyInstanceUID", Action: "remap_uid"},
-				},
-			},
-		}},
 		ValidateRules: ValidateSection{Profiles: map[string]ValidateProfile{
 			"ct-required-identifiers": {Rules: []ValidateRule{{
 				When:     Condition{Path: "Modality", Equals: &ct},
@@ -175,34 +150,6 @@ func (file File) Validate() error {
 	for name, profile := range file.Inspect.Profiles {
 		for index, path := range profile.Tags {
 			problems = append(problems, validatePath(fmt.Sprintf("inspect.profiles.%s.tags[%d]", name, index), path))
-		}
-	}
-	for name, profile := range file.Anonymize.Profiles {
-		if profile.Filter != "" {
-			if _, ok := file.Filters[profile.Filter]; !ok {
-				problems = append(problems, fmt.Errorf("anonymize profile %q references missing filter %q", name, profile.Filter))
-			}
-		}
-		seen := map[string]bool{}
-		for index, rule := range profile.Rules {
-			prefix := fmt.Sprintf("anonymize.profiles.%s.rules[%d]", name, index)
-			problems = append(problems, validatePath(prefix+".path", rule.Path))
-			if seen[rule.Path] {
-				problems = append(problems, fmt.Errorf("%s duplicates an action for %q", prefix, rule.Path))
-			}
-			seen[rule.Path] = true
-			switch rule.Action {
-			case "delete", "clear", "remap_uid":
-				if rule.Value != nil {
-					problems = append(problems, fmt.Errorf("%s.action %q does not accept value", prefix, rule.Action))
-				}
-			case "replace":
-				if rule.Value == nil {
-					problems = append(problems, fmt.Errorf("%s.action replace requires value", prefix))
-				}
-			default:
-				problems = append(problems, fmt.Errorf("%s.action %q is unknown", prefix, rule.Action))
-			}
 		}
 	}
 	for name, profile := range file.ValidateRules.Profiles {
