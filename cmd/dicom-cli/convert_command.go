@@ -195,11 +195,13 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 				generated := dataset.Clone()
 				buildErr = convertpkg.ApplyMetadata(dataset, template)
 				if buildErr == nil && reference != nil {
-					dataset.Merge(reference, true)
+					buildErr = dataset.Merge(reference, true)
 				}
 				if buildErr == nil {
-					dataset.Merge(generated, true)
-					buildErr = convertpkg.ApplyMetadata(dataset, map[string]string{"PatientName": patientName})
+					buildErr = dataset.Merge(generated, true)
+					if buildErr == nil {
+						buildErr = convertpkg.ApplyMetadata(dataset, map[string]string{"PatientName": patientName})
+					}
 				}
 			}
 			if buildErr != nil {

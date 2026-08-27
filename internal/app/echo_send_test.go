@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -10,7 +11,10 @@ import (
 
 	"github.com/cocosip/dicom-cli/internal/config"
 	"github.com/cocosip/dicom-cli/internal/testutil"
+	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
+	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
+	"github.com/cocosip/go-dicom/pkg/network/client"
 	godimse "github.com/cocosip/go-dicom/pkg/network/dimse"
 	"github.com/cocosip/go-dicom/pkg/network/server"
 	"github.com/cocosip/go-dicom/pkg/network/status"
@@ -106,6 +110,22 @@ func TestClientUsesConfiguredDIMSETimeouts(t *testing.T) {
 	settings := client.GetConfig()
 	if settings.ConnectTimeout != target.Timeouts.Connect || settings.AssociationTimeout != target.Timeouts.Associate || settings.RequestTimeout != target.Timeouts.Idle {
 		t.Fatalf("client timeouts = %#v", settings)
+	}
+}
+
+func TestOpenRejectsTooManyPresentationContexts(t *testing.T) {
+	instances := make([]Instance, 129)
+	for index := range instances {
+		instances[index] = Instance{
+			Path:           fmt.Sprintf("instance-%d.dcm", index),
+			Dataset:        dataset.New(),
+			SOPClass:       fmt.Sprintf("1.2.840.10008.5.1.4.1.1.%d", index),
+			TransferSyntax: transfer.ExplicitVRLittleEndian.UID().String(),
+		}
+	}
+	_, err := Open(context.Background(), config.PACSTarget{}, instances)
+	if !errors.Is(err, client.ErrTooManyPresentationContexts) {
+		t.Fatalf("Open() error = %v, want ErrTooManyPresentationContexts", err)
 	}
 }
 

@@ -88,11 +88,13 @@ func ReadInstance(path string) (Instance, error) {
 // Echo opens a Verification Association and sends one C-ECHO request.
 func Echo(ctx context.Context, target config.PACSTarget) error {
 	c := newClient(target)
-	c.AddPresentationContext(
+	if err := c.AddPresentationContext(
 		verificationSOPClassUID,
 		transfer.ImplicitVRLittleEndian.UID().String(),
 		transfer.ExplicitVRLittleEndian.UID().String(),
-	)
+	); err != nil {
+		return err
+	}
 	if err := c.Connect(ctx, target.Host, target.Port); err != nil {
 		return err
 	}
@@ -118,7 +120,9 @@ func Open(ctx context.Context, target config.PACSTarget, instances []Instance) (
 	}
 	c := newClient(target)
 	for sopClass, syntaxes := range contexts {
-		c.AddPresentationContext(sopClass, syntaxes...)
+		if err := c.AddPresentationContext(sopClass, syntaxes...); err != nil {
+			return nil, err
+		}
 	}
 	if err := c.Connect(ctx, target.Host, target.Port); err != nil {
 		return nil, err

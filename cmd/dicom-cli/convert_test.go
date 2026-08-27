@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cocosip/dicom-cli/internal/testutil"
+	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
@@ -218,6 +219,34 @@ func TestExecuteConvertDICOMMergesTemplateReferenceAndCLI(t *testing.T) {
 	}
 	if got, _ := parsed.Dataset.GetString(tag.StudyDescription); got != "REFERENCE STUDY" {
 		t.Fatalf("StudyDescription = %q, want reference metadata", got)
+	}
+}
+
+func TestRunImageToDICOMRejectsInvalidReferenceMetadata(t *testing.T) {
+	input := filepath.Join(t.TempDir(), "input.png")
+	file, err := os.Create(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(file, image.NewGray(image.Rect(0, 0, 1, 1))); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reference := dataset.New()
+	reference.SetAutoValidate(false)
+	if err := reference.Add(element.NewString(tag.ReferencedSOPInstanceUID, vr.UI, []string{"invalid"})); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output.dcm")
+	runtime, _, _ := testRuntime()
+	if err := runImageToDICOM(runtime, input, "SYNTHETIC^PATIENT", output, false, false, false, nil, reference); err == nil {
+		t.Fatal("runImageToDICOM() error = nil, want invalid reference metadata error")
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("output exists after invalid reference metadata, stat error = %v", err)
 	}
 }
 

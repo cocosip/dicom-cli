@@ -36,7 +36,6 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Claude Code configuration (optional - keep if needed)
-.claude/
+ 
 
-.gocache/
+.cache/
