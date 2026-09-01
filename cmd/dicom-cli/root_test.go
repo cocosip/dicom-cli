@@ -3,12 +3,15 @@ package main
 import (
 	"bytes"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cocosip/dicom-cli/internal/i18n"
+	"github.com/cocosip/dicom-cli/internal/testutil"
+	dicomlogging "github.com/cocosip/go-dicom/pkg/logging"
 )
 
 func TestExecuteHelpListsP0GlobalFlags(t *testing.T) {
@@ -234,6 +237,67 @@ func TestExecuteAcceptsP0GlobalFlags(t *testing.T) {
 				t.Fatalf("Execute(%v) = %d, want 0", tt.args, code)
 			}
 		})
+	}
+}
+
+func TestExecuteRoutesGoDICOMLogsThroughCLIHandler(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalDefault := slog.Default()
+
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "text",
+			args: []string{"--verbose", "validate", fixtures.SingleFrame},
+			want: []string{"component=dicom.parser", "event=parse_completed"},
+		},
+		{
+			name: "json",
+			args: []string{"--verbose", "--log-format", "json", "validate", fixtures.SingleFrame},
+			want: []string{`"component":"dicom.parser"`, `"event":"parse_completed"`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime, _, stderr := testRuntime()
+
+			if code := Execute(tt.args, runtime); code != 0 {
+				t.Fatalf("Execute(%v) = %d, stderr = %s", tt.args, code, stderr.String())
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(stderr.String(), want) {
+					t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+				}
+			}
+			if slog.Default() != originalDefault {
+				t.Fatal("slog.Default() changed")
+			}
+			if dicomlogging.Configured() {
+				t.Fatal("go-dicom logging remains configured after Execute")
+			}
+		})
+	}
+}
+
+func TestExecuteUsesCLILogLevelForGoDICOMLogs(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, _, stderr := testRuntime()
+
+	if code := Execute([]string{"validate", fixtures.SingleFrame}, runtime); code != 0 {
+		t.Fatalf("Execute() = %d, stderr = %s", code, stderr.String())
+	}
+	if strings.Contains(stderr.String(), "parse_completed") {
+		t.Fatalf("stderr = %q, contains debug go-dicom log", stderr.String())
 	}
 }
 

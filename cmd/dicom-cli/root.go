@@ -13,6 +13,7 @@ import (
 	"github.com/cocosip/dicom-cli/internal/config"
 	"github.com/cocosip/dicom-cli/internal/i18n"
 	"github.com/cocosip/dicom-cli/internal/logging"
+	dicomlogging "github.com/cocosip/go-dicom/pkg/logging"
 )
 
 // Runtime provides process dependencies to commands without requiring globals.
@@ -51,6 +52,7 @@ func Execute(args []string, runtime Runtime) int {
 	localizer := localizerForArgs(args, runtime)
 	command := NewRootCommand(runtime, localizer)
 	command.SetArgs(args)
+	defer dicomlogging.Disable()
 
 	if err := command.Execute(); err != nil {
 		_, _ = fmt.Fprintln(runtime.Stderr, localizer.ReplaceDiagnostic(err.Error()))
@@ -72,12 +74,10 @@ func NewRootCommand(runtime Runtime, localizer i18n.Localizer) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(*cobra.Command, []string) error {
-			if options.verbose && options.quiet {
-				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--verbose and --quiet cannot be used together"))
-			}
-
-			_, err := logging.New(logLevel(options), options.logFormat, runtime.Stderr)
-			return err
+			return configureLogging(options, runtime.Stderr)
+		},
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return configureLogging(options, runtime.Stderr)
 		},
 	}
 
@@ -225,4 +225,17 @@ func logLevel(options rootOptions) slog.Level {
 	}
 
 	return slog.LevelInfo
+}
+
+func configureLogging(options rootOptions, stderr io.Writer) error {
+	if options.verbose && options.quiet {
+		return apperr.Wrap(apperr.KindInput, fmt.Errorf("--verbose and --quiet cannot be used together"))
+	}
+
+	logger, err := logging.New(logLevel(options), options.logFormat, stderr)
+	if err != nil {
+		return err
+	}
+
+	return dicomlogging.Configure(dicomlogging.Config{Handler: logger.Handler()})
 }
