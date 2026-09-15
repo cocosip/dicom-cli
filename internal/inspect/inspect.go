@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/cocosip/dicom-cli/internal/dicom"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
@@ -250,8 +251,10 @@ func Build(path string, parsed *parser.ParseResult, options Options) (Report, er
 
 func describe(source, path string, elem element.Element) ElementReport {
 	value := elem.String()
-	if stringElement, ok := elem.(*element.String); ok {
-		value = stringElement.GetString()
+	if elem.ValueRepresentation().IsString() {
+		if values, err := element.CanonicalStrings(elem); err == nil {
+			value = strings.Join(values, "\\")
+		}
 	}
 	return ElementReport{Source: source, Path: path, Tag: elem.Tag().Format("g"), VR: elem.ValueRepresentation().Code(), Value: value}
 }

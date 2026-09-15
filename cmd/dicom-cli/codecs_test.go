@@ -8,7 +8,7 @@ import (
 )
 
 func TestRuntimeRegistersCompressedCodecs(t *testing.T) {
-	registry := codec.GetGlobalRegistry()
+	registry := codec.GlobalRegistry()
 
 	for _, syntax := range []*transfer.Syntax{
 		transfer.RLELossless,
@@ -19,14 +19,14 @@ func TestRuntimeRegistersCompressedCodecs(t *testing.T) {
 		transfer.JPEGLSLossless,
 		transfer.JPEGLSNearLossless,
 		transfer.JPEG2000Lossless,
-		transfer.JPEG2000Lossy,
+		transfer.JPEG2000,
 		transfer.JPEG2000Part2MultiComponentLosslessOnly,
 		transfer.JPEG2000Part2MultiComponent,
 		transfer.HTJ2KLossless,
 		transfer.HTJ2KLosslessRPCL,
 		transfer.HTJ2K,
 	} {
-		if !registry.HasCodec(syntax) {
+		if _, ok := registry.Lookup(syntax); !ok {
 			t.Errorf("codec for transfer syntax %s is not registered", syntax.UID().UID())
 		}
 	}

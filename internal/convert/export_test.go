@@ -2,6 +2,7 @@ package convert
 
 import (
 	"bytes"
+	"context"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -26,7 +27,7 @@ func TestExportFrameSelectsRequestedFrameAndPreserves16BitPNG(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content, err := ExportFrame(parsed.Dataset, parsed.TransferSyntax, 1, PNG)
+	content, err := ExportFrame(context.Background(), parsed.Dataset, parsed.TransferSyntax, 1, PNG)
 	if err != nil {
 		t.Fatalf("ExportFrame() error = %v", err)
 	}
@@ -51,7 +52,7 @@ func TestTranscodeRetainsDatasetValuesAndChangesTransferSyntax(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	converted, err := Transcode(parsed.Dataset, parsed.TransferSyntax, transfer.ImplicitVRLittleEndian)
+	converted, err := Transcode(context.Background(), parsed.Dataset, parsed.TransferSyntax, transfer.ImplicitVRLittleEndian)
 	if err != nil {
 		t.Fatalf("Transcode() error = %v", err)
 	}
@@ -76,7 +77,7 @@ func TestExportFrameAppliesWindowForJPEG(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content, err := ExportFrame(parsed.Dataset, parsed.TransferSyntax, 0, JPEG)
+	content, err := ExportFrame(context.Background(), parsed.Dataset, parsed.TransferSyntax, 0, JPEG)
 	if err != nil {
 		t.Fatalf("ExportFrame() error = %v", err)
 	}
@@ -113,7 +114,7 @@ func TestExportFrameAppliesCTRescaleAndWindowForJPEG(t *testing.T) {
 		}
 	}
 
-	content, err := ExportFrame(parsed.Dataset, parsed.TransferSyntax, 0, JPEG)
+	content, err := ExportFrame(context.Background(), parsed.Dataset, parsed.TransferSyntax, 0, JPEG)
 	if err != nil {
 		t.Fatalf("ExportFrame() error = %v", err)
 	}
@@ -182,7 +183,7 @@ func TestExportPixelDataConcatenatesRawFrames(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content, err := ExportPixelData(parsed.Dataset)
+	content, err := ExportPixelData(context.Background(), parsed.Dataset)
 	if err != nil {
 		t.Fatal(err)
 	}

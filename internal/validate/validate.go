@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	"github.com/cocosip/dicom-cli/internal/dicom"
@@ -153,8 +154,9 @@ func evaluate(parsed *parser.ParseResult, condition rules.Condition) bool {
 }
 
 func elementValue(elem element.Element) string {
-	if value, ok := elem.(*element.String); ok {
-		return value.GetString()
+	values, err := element.CanonicalStrings(elem)
+	if err == nil {
+		return strings.Join(values, "\\")
 	}
 	return elem.String()
 }

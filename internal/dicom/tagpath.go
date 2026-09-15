@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
+	"github.com/cocosip/go-dicom/pkg/dicom/dict"
 	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 )
@@ -87,10 +88,10 @@ func parseSegment(value string) (TagSegment, error) {
 		segment.Tag = parsed
 		return segment, nil
 	}
-	keyword, keywordErr := tag.ParseKeyword(segment.Token)
-	if keywordErr != nil {
-		return TagSegment{}, fmt.Errorf("invalid Tag %q: %w", segment.Token, keywordErr)
+	keyword := dict.Default().LookupKeyword(segment.Token)
+	if keyword == nil {
+		return TagSegment{}, fmt.Errorf("invalid Tag %q: keyword not found", segment.Token)
 	}
-	segment.Tag = &keyword
+	segment.Tag = keyword
 	return segment, nil
 }

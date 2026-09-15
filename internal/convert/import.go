@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"image"
@@ -12,10 +13,10 @@ import (
 
 	"github.com/cocosip/dicom-cli/internal/edit"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
-	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
+	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 	"github.com/cocosip/go-dicom/pkg/dicom/uid"
-	"github.com/cocosip/go-dicom/pkg/dicom/vr"
+	"github.com/cocosip/go-dicom/pkg/imaging/pixeldata"
 )
 
 // ImportedImage is an uncompressed image accepted for Secondary Capture.
@@ -110,7 +111,7 @@ type SecondaryCaptureOptions struct {
 
 // NewSecondaryCapture creates an Explicit VR Little Endian-compatible
 // Secondary Capture dataset from a supported imported image.
-func NewSecondaryCapture(imageValue ImportedImage, options SecondaryCaptureOptions) (*dataset.Dataset, error) {
+func NewSecondaryCapture(ctx context.Context, imageValue ImportedImage, options SecondaryCaptureOptions) (*dataset.Dataset, error) {
 	if options.PatientName == "" {
 		return nil, fmt.Errorf("PatientName is required")
 	}
@@ -123,36 +124,45 @@ func NewSecondaryCapture(imageValue ImportedImage, options SecondaryCaptureOptio
 	if options.SOPInstanceUID == "" {
 		options.SOPInstanceUID = uid.GenerateDerivedFromUUID().UID()
 	}
-	ds := dataset.New()
-	elements := []element.Element{
-		element.NewString(tag.PatientName, vr.PN, []string{options.PatientName}),
-		element.NewString(tag.StudyInstanceUID, vr.UI, []string{options.StudyUID}),
-		element.NewString(tag.SeriesInstanceUID, vr.UI, []string{options.SeriesUID}),
-		element.NewString(tag.SOPClassUID, vr.UI, []string{uid.SecondaryCaptureImageStorage.UID()}),
-		element.NewString(tag.SOPInstanceUID, vr.UI, []string{options.SOPInstanceUID}),
-		element.NewString(tag.Modality, vr.CS, []string{"OT"}),
-		element.NewString(tag.ConversionType, vr.CS, []string{"WSD"}),
-		element.NewUnsignedShort(tag.Rows, []uint16{uint16(imageValue.Height)}),
-		element.NewUnsignedShort(tag.Columns, []uint16{uint16(imageValue.Width)}),
-		element.NewUnsignedShort(tag.SamplesPerPixel, []uint16{imageValue.SamplesPerPixel}),
-		element.NewString(tag.PhotometricInterpretation, vr.CS, []string{imageValue.PhotometricInterpretation}),
-		element.NewUnsignedShort(tag.BitsAllocated, []uint16{imageValue.BitsAllocated}),
-		element.NewUnsignedShort(tag.BitsStored, []uint16{imageValue.BitsStored}),
-		element.NewUnsignedShort(tag.HighBit, []uint16{imageValue.BitsStored - 1}),
-		element.NewUnsignedShort(tag.PixelRepresentation, []uint16{0}),
+	ds := dataset.NewWithTransferSyntax(transfer.ExplicitVRLittleEndian)
+	type datasetValue struct {
+		tag   *tag.Tag
+		value any
+	}
+	values := []datasetValue{
+		{tag.PatientName, options.PatientName},
+		{tag.StudyInstanceUID, options.StudyUID},
+		{tag.SeriesInstanceUID, options.SeriesUID},
+		{tag.SOPClassUID, uid.SecondaryCaptureImageStorage.UID()},
+		{tag.SOPInstanceUID, options.SOPInstanceUID},
+		{tag.Modality, "OT"},
+		{tag.ConversionType, "WSD"},
+		{tag.Rows, uint16(imageValue.Height)},
+		{tag.Columns, uint16(imageValue.Width)},
+		{tag.SamplesPerPixel, imageValue.SamplesPerPixel},
+		{tag.PhotometricInterpretation, imageValue.PhotometricInterpretation},
+		{tag.BitsAllocated, imageValue.BitsAllocated},
+		{tag.BitsStored, imageValue.BitsStored},
+		{tag.HighBit, imageValue.BitsStored - 1},
+		{tag.PixelRepresentation, uint16(0)},
 	}
 	if imageValue.SamplesPerPixel == 3 {
-		elements = append(elements, element.NewUnsignedShort(tag.PlanarConfiguration, []uint16{0}))
+		values = append(values, datasetValue{tag.PlanarConfiguration, uint16(0)})
 	}
-	if imageValue.BitsAllocated == 16 {
-		elements = append(elements, element.NewOtherWord(tag.PixelData, imageValue.PixelData))
-	} else {
-		elements = append(elements, element.NewOtherByte(tag.PixelData, imageValue.PixelData))
-	}
-	for _, item := range elements {
-		if err := ds.Add(item); err != nil {
+	for _, item := range values {
+		if err := ds.AddValue(item.tag, item.value); err != nil {
 			return nil, err
 		}
+	}
+	pixels, err := pixeldata.NewForDataset(ds)
+	if err != nil {
+		return nil, err
+	}
+	if err := pixels.AddFrame(ctx, imageValue.PixelData); err != nil {
+		return nil, err
+	}
+	if err := pixels.WriteToDataset(ds); err != nil {
+		return nil, err
 	}
 	return ds, nil
 }

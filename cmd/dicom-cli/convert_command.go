@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,11 +50,11 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Example: "  dicom-cli convert image --input image.dcm --format png --output image.png\n" +
 			"  dicom-cli convert image --input image.dcm --all-frames --output frames",
 		Args: noArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(command *cobra.Command, _ []string) error {
 			if imageInput == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
 			}
-			return runDICOMExport(runtime, imageInput, options)
+			return runDICOMExport(command.Context(), runtime, imageInput, options)
 		},
 	}
 	imageCommand.Flags().StringVarP(&imageInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
@@ -72,12 +73,12 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Long:    jsonText.Long,
 		Example: "  dicom-cli convert json --input image.dcm --output metadata.json",
 		Args:    noArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(command *cobra.Command, _ []string) error {
 			if jsonInput == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
 			}
 			options.format = "json"
-			return runDICOMExport(runtime, jsonInput, options)
+			return runDICOMExport(command.Context(), runtime, jsonInput, options)
 		},
 	}
 	jsonCommand.Flags().StringVarP(&jsonInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
@@ -93,12 +94,12 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Long:    xmlText.Long,
 		Example: "  dicom-cli convert xml --input image.dcm --output metadata.xml",
 		Args:    noArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(command *cobra.Command, _ []string) error {
 			if xmlInput == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
 			}
 			options.format = "xml"
-			return runDICOMExport(runtime, xmlInput, options)
+			return runDICOMExport(command.Context(), runtime, xmlInput, options)
 		},
 	}
 	xmlCommand.Flags().StringVarP(&xmlInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
@@ -114,12 +115,12 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Long:    pixelDataText.Long,
 		Example: "  dicom-cli convert pixeldata --input image.dcm --output pixels.bin",
 		Args:    noArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(command *cobra.Command, _ []string) error {
 			if pixelDataInput == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
 			}
 			options.format = "pixeldata"
-			return runDICOMExport(runtime, pixelDataInput, options)
+			return runDICOMExport(command.Context(), runtime, pixelDataInput, options)
 		},
 	}
 	pixelDataCommand.Flags().StringVarP(&pixelDataInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
@@ -137,15 +138,15 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	return command
 }
 
-func runImageToDICOMWithMetadata(runtime Runtime, root *rootOptions, input, patientName, templateName, referencePath, destination string, recursive, failFast, flatten bool) error {
+func runImageToDICOMWithMetadata(ctx context.Context, runtime Runtime, root *rootOptions, input, patientName, templateName, referencePath, destination string, recursive, failFast, flatten bool) error {
 	template, reference, err := imageMetadataSources(runtime, root.rulesPath, templateName, referencePath)
 	if err != nil {
 		return apperr.Wrap(apperr.KindInput, err)
 	}
-	return runImageToDICOM(runtime, input, patientName, destination, recursive, failFast, flatten, template, reference)
+	return runImageToDICOM(ctx, runtime, input, patientName, destination, recursive, failFast, flatten, template, reference)
 }
 
-func runImageToDICOM(runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool, template map[string]string, reference *dataset.Dataset) error {
+func runImageToDICOM(ctx context.Context, runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool, template map[string]string, reference *dataset.Dataset) error {
 	if patientName == "" {
 		if reference != nil {
 			patientName, _ = reference.GetString(tag.PatientName)
@@ -190,7 +191,7 @@ func runImageToDICOM(runtime Runtime, input, patientName, destination string, re
 		}
 		imageValue, err := convertpkg.LoadImage(entry.Path)
 		if err == nil {
-			dataset, buildErr := convertpkg.NewSecondaryCapture(imageValue, convertpkg.SecondaryCaptureOptions{PatientName: patientName, StudyUID: studyUID, SeriesUID: seriesUID})
+			dataset, buildErr := convertpkg.NewSecondaryCapture(ctx, imageValue, convertpkg.SecondaryCaptureOptions{PatientName: patientName, StudyUID: studyUID, SeriesUID: seriesUID})
 			if buildErr == nil {
 				generated := dataset.Clone()
 				buildErr = convertpkg.ApplyMetadata(dataset, template)
@@ -280,7 +281,7 @@ func imageMetadataSources(runtime Runtime, configuredRules, templateName, refere
 	return template, reference, nil
 }
 
-func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) error {
+func runDICOMExport(ctx context.Context, runtime Runtime, input string, options dicomExportOptions) error {
 	format := strings.ToLower(options.format)
 	if format == "jpg" {
 		format = string(convertpkg.JPEG)
@@ -302,12 +303,12 @@ func runDICOMExport(runtime Runtime, input string, options dicomExportOptions) e
 		return apperr.Wrap(apperr.KindOperation, err)
 	}
 	if info.IsDir() {
-		return runDICOMExportDirectory(runtime, input, format, options)
+		return runDICOMExportDirectory(ctx, runtime, input, format, options)
 	}
-	return runDICOMExportFile(runtime, input, format, options, options.destination)
+	return runDICOMExportFile(ctx, runtime, input, format, options, options.destination)
 }
 
-func runDICOMExportDirectory(runtime Runtime, input, format string, options dicomExportOptions) error {
+func runDICOMExportDirectory(ctx context.Context, runtime Runtime, input, format string, options dicomExportOptions) error {
 	if options.destination == "-" {
 		return apperr.Wrap(apperr.KindInput, fmt.Errorf("binary stdout requires exactly one input file"))
 	}
@@ -333,7 +334,7 @@ func runDICOMExportDirectory(runtime Runtime, input, format string, options dico
 		if entry.Skipped {
 			continue
 		}
-		if err := runDICOMExportFile(runtime, entry.Path, format, options, destinationForDICOMExport(entry.Path, input, destination, format, options)); err != nil {
+		if err := runDICOMExportFile(ctx, runtime, entry.Path, format, options, destinationForDICOMExport(entry.Path, input, destination, format, options)); err != nil {
 			failed++
 			if options.failFast {
 				break
@@ -358,7 +359,7 @@ func destinationForDICOMExport(path, root, destination, format string, options d
 	return strings.TrimSuffix(name, filepath.Ext(name)) + "." + exportExtension(format)
 }
 
-func runDICOMExportFile(runtime Runtime, input, format string, options dicomExportOptions, destination string) error {
+func runDICOMExportFile(ctx context.Context, runtime Runtime, input, format string, options dicomExportOptions, destination string) error {
 	parsed, err := parser.ParseFile(input)
 	if err != nil {
 		return apperr.Wrap(apperr.KindOperation, err)
@@ -371,7 +372,7 @@ func runDICOMExportFile(runtime Runtime, input, format string, options dicomExpo
 		case "xml":
 			content, err = convertpkg.ExportXML(parsed.Dataset)
 		case "pixeldata":
-			content, err = convertpkg.ExportPixelData(parsed.Dataset)
+			content, err = convertpkg.ExportPixelData(ctx, parsed.Dataset)
 		}
 		if err != nil {
 			return apperr.Wrap(apperr.KindOperation, err)
@@ -405,7 +406,7 @@ func runDICOMExportFile(runtime Runtime, input, format string, options dicomExpo
 		}
 	}
 	for _, frame := range frames {
-		content, err := convertpkg.ExportFrame(parsed.Dataset, parsed.TransferSyntax, frame, convertpkg.ImageFormat(format))
+		content, err := convertpkg.ExportFrame(ctx, parsed.Dataset, parsed.TransferSyntax, frame, convertpkg.ImageFormat(format))
 		if err != nil {
 			return apperr.Wrap(apperr.KindOperation, err)
 		}

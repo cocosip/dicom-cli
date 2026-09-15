@@ -3,6 +3,7 @@ package convert
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"image"
@@ -16,9 +17,12 @@ import (
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/serialization"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
+	dicomtranscode "github.com/cocosip/go-dicom/pkg/dicom/transcode"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
-	"github.com/cocosip/go-dicom/pkg/imaging"
 	"github.com/cocosip/go-dicom/pkg/imaging/codec"
+	"github.com/cocosip/go-dicom/pkg/imaging/colorconv"
+	"github.com/cocosip/go-dicom/pkg/imaging/pixel"
+	"github.com/cocosip/go-dicom/pkg/imaging/pixeldata"
 	"github.com/cocosip/go-dicom/pkg/imaging/render"
 )
 
@@ -32,11 +36,11 @@ const (
 
 // ExportFrame encodes a zero-indexed DICOM frame. JPEG grayscale output uses
 // the DICOM rescale and window settings so it is suitable for display.
-func ExportFrame(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, format ImageFormat) ([]byte, error) {
+func ExportFrame(ctx context.Context, ds *dataset.Dataset, syntax *transfer.Syntax, frame int, format ImageFormat) ([]byte, error) {
 	if format == JPEG {
-		return exportJPEG(ds, syntax, frame)
+		return exportJPEG(ctx, ds, syntax, frame)
 	}
-	imageValue, err := frameImage(ds, syntax, frame, format == JPEG)
+	imageValue, err := frameImage(ctx, ds, syntax, frame, format == JPEG)
 	if err != nil {
 		return nil, err
 	}
@@ -53,8 +57,8 @@ func ExportFrame(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, format
 	return content.Bytes(), nil
 }
 
-func exportJPEG(ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte, error) {
-	pixelData, err := imaging.CreatePixelData(ds)
+func exportJPEG(ctx context.Context, ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte, error) {
+	pixelData, err := pixeldata.FromDataset(ds)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +66,7 @@ func exportJPEG(ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte
 		return nil, fmt.Errorf("frame %d is outside [0, %d)", frame, pixelData.FrameCount())
 	}
 	if pixelData.Info.SamplesPerPixel != 1 {
-		imageValue, err := frameImage(ds, syntax, frame, false)
+		imageValue, err := frameImage(ctx, ds, syntax, frame, false)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +77,7 @@ func exportJPEG(ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte
 		return content.Bytes(), nil
 	}
 
-	raw, err := decodedFrame(ds, syntax, pixelData, frame)
+	raw, err := decodedFrame(ctx, ds, syntax, pixelData, frame)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +85,7 @@ func exportJPEG(ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	minInput, maxInput := grayscaleRange(pixelData.Info.BitsStored, pixelData.Info.PixelRepresentation == imaging.SignedPixels)
+	minInput, maxInput := grayscaleRange(pixelData.Info.BitsStored, pixelData.Info.PixelRepresentation == pixel.SignedPixels)
 	pipeline := render.NewGrayscalePipeline(slope, intercept, center, width, minInput, maxInput, false)
 	exporter := render.NewImageExporter(pipeline)
 	photometric := "MONOCHROME2"
@@ -96,7 +100,7 @@ func exportJPEG(ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte
 		int(pixelData.Info.Height),
 		int(pixelData.Info.BitsAllocated),
 		int(pixelData.Info.BitsStored),
-		pixelData.Info.PixelRepresentation == imaging.SignedPixels,
+		pixelData.Info.PixelRepresentation == pixel.SignedPixels,
 		photometric,
 		&render.ExportOptions{Format: render.FormatJPEG, JPEGQuality: 95},
 	)
@@ -106,7 +110,7 @@ func exportJPEG(ds *dataset.Dataset, syntax *transfer.Syntax, frame int) ([]byte
 	return content.Bytes(), nil
 }
 
-func grayscaleDisplaySettings(ds *dataset.Dataset, info *imaging.PixelDataInfo) (slope, intercept, center, width float64, err error) {
+func grayscaleDisplaySettings(ds *dataset.Dataset, info *pixeldata.Info) (slope, intercept, center, width float64, err error) {
 	slope, err = dicomDecimal(ds, tag.RescaleSlope, 1)
 	if err != nil {
 		return 0, 0, 0, 0, err
@@ -115,7 +119,7 @@ func grayscaleDisplaySettings(ds *dataset.Dataset, info *imaging.PixelDataInfo) 
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	minInput, maxInput := grayscaleRange(info.BitsStored, info.PixelRepresentation == imaging.SignedPixels)
+	minInput, maxInput := grayscaleRange(info.BitsStored, info.PixelRepresentation == pixel.SignedPixels)
 	minOutput := minInput*slope + intercept
 	maxOutput := maxInput*slope + intercept
 	if minOutput > maxOutput {
@@ -173,14 +177,14 @@ func ExportXML(ds *dataset.Dataset) ([]byte, error) {
 
 // ExportPixelData concatenates the stored payload of each frame without
 // decoding or transcoding it.
-func ExportPixelData(ds *dataset.Dataset) ([]byte, error) {
-	pixelData, err := imaging.CreatePixelData(ds)
+func ExportPixelData(ctx context.Context, ds *dataset.Dataset) ([]byte, error) {
+	pixelData, err := pixeldata.FromDataset(ds)
 	if err != nil {
 		return nil, err
 	}
 	var content bytes.Buffer
 	for frame := 0; frame < pixelData.FrameCount(); frame++ {
-		data, err := pixelData.GetFrame(frame)
+		data, err := pixelData.Frame(ctx, frame)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +203,7 @@ func metadataDataset(ds *dataset.Dataset) *dataset.Dataset {
 
 // FrameCount returns the number of frames in a DICOM dataset.
 func FrameCount(ds *dataset.Dataset) (int, error) {
-	pixelData, err := imaging.CreatePixelData(ds)
+	pixelData, err := pixeldata.FromDataset(ds)
 	if err != nil {
 		return 0, err
 	}
@@ -209,26 +213,30 @@ func FrameCount(ds *dataset.Dataset) (int, error) {
 // Transcode converts dataset pixel data to target while preserving unrelated
 // dataset elements. The target syntax must be available in the process codec
 // registry.
-func Transcode(ds *dataset.Dataset, source, target *transfer.Syntax) (*dataset.Dataset, error) {
+func Transcode(ctx context.Context, ds *dataset.Dataset, source, target *transfer.Syntax) (*dataset.Dataset, error) {
 	if source == nil || target == nil {
 		return nil, fmt.Errorf("source and target transfer syntaxes are required")
 	}
-	transcoder, err := codec.GetDefaultManager().CreateTranscoder(source, target)
+	manager, err := dicomtranscode.NewManager(codec.GlobalRegistry())
 	if err != nil {
 		return nil, err
 	}
-	return transcoder.Transcode(ds)
+	transcoder, err := manager.NewTranscoder(source, target)
+	if err != nil {
+		return nil, err
+	}
+	return transcoder.Transcode(ctx, ds)
 }
 
-func frameImage(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, jpegTarget bool) (image.Image, error) {
-	pixelData, err := imaging.CreatePixelData(ds)
+func frameImage(ctx context.Context, ds *dataset.Dataset, syntax *transfer.Syntax, frame int, jpegTarget bool) (image.Image, error) {
+	pixelData, err := pixeldata.FromDataset(ds)
 	if err != nil {
 		return nil, err
 	}
 	if frame < 0 || frame >= pixelData.FrameCount() {
 		return nil, fmt.Errorf("frame %d is outside [0, %d)", frame, pixelData.FrameCount())
 	}
-	raw, err := decodedFrame(ds, syntax, pixelData, frame)
+	raw, err := decodedFrame(ctx, ds, syntax, pixelData, frame)
 	if err != nil {
 		return nil, err
 	}
@@ -237,8 +245,8 @@ func frameImage(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, jpegTar
 		return grayscaleImage(raw, int(info.Width), int(info.Height), info.BitsAllocated, info.BitsStored, jpegTarget)
 	}
 	if info.SamplesPerPixel == 3 && info.BitsAllocated == 8 {
-		if info.PlanarConfiguration == imaging.PlanarPlanar {
-			raw, err = imaging.ConvertPlanarToInterleavedGeneric(raw, 3, 1)
+		if info.PlanarConfiguration == pixel.PlanarPlanar {
+			raw, err = colorconv.PlanarToInterleaved(raw, 3, 1)
 			if err != nil {
 				return nil, err
 			}
@@ -248,15 +256,19 @@ func frameImage(ds *dataset.Dataset, syntax *transfer.Syntax, frame int, jpegTar
 	return nil, fmt.Errorf("unsupported pixel layout: samples=%d bits=%d", info.SamplesPerPixel, info.BitsAllocated)
 }
 
-func decodedFrame(ds *dataset.Dataset, syntax *transfer.Syntax, pixelData *imaging.DicomPixelData, frame int) ([]byte, error) {
+func decodedFrame(ctx context.Context, ds *dataset.Dataset, syntax *transfer.Syntax, pixelData *pixeldata.Data, frame int) ([]byte, error) {
 	if syntax == nil || !syntax.IsEncapsulated() {
-		return pixelData.GetFrame(frame)
+		return pixelData.Frame(ctx, frame)
 	}
-	transcoder, err := codec.GetDefaultManager().CreateTranscoder(syntax, transfer.ExplicitVRLittleEndian)
+	manager, err := dicomtranscode.NewManager(codec.GlobalRegistry())
 	if err != nil {
 		return nil, err
 	}
-	return transcoder.DecodeFrame(ds, frame)
+	transcoder, err := manager.NewTranscoder(syntax, transfer.ExplicitVRLittleEndian)
+	if err != nil {
+		return nil, err
+	}
+	return transcoder.DecodeFrame(ctx, ds, frame)
 }
 
 func grayscaleImage(raw []byte, width, height int, bitsAllocated, bitsStored uint16, jpegTarget bool) (image.Image, error) {

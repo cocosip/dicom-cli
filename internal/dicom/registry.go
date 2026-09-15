@@ -50,9 +50,10 @@ var formatMetadataByUID = map[string]formatMetadata{
 // the current process. Metadata supplies user-facing aliases but never adds
 // capabilities that the registry did not report.
 func RuntimeCodecs() []CodecFormat {
-	registry := codec.GetGlobalRegistry()
+	registry := codec.GlobalRegistry()
 	formats := make([]CodecFormat, 0)
-	for _, uid := range registry.ListCodecs() {
+	for _, registered := range registry.List() {
+		uid := registered.TransferSyntax().UID().UID()
 		syntax, err := transfer.Parse(uid)
 		if err != nil {
 			continue

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -242,7 +243,7 @@ func TestRunImageToDICOMRejectsInvalidReferenceMetadata(t *testing.T) {
 	}
 	output := filepath.Join(t.TempDir(), "output.dcm")
 	runtime, _, _ := testRuntime()
-	if err := runImageToDICOM(runtime, input, "SYNTHETIC^PATIENT", output, false, false, false, nil, reference); err == nil {
+	if err := runImageToDICOM(context.Background(), runtime, input, "SYNTHETIC^PATIENT", output, false, false, false, nil, reference); err == nil {
 		t.Fatal("runImageToDICOM() error = nil, want invalid reference metadata error")
 	}
 	if _, err := os.Stat(output); !os.IsNotExist(err) {

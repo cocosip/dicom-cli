@@ -3,7 +3,6 @@ package edit
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/cocosip/dicom-cli/internal/dicom"
@@ -47,23 +46,43 @@ func Apply(ds *dataset.Dataset, operations []Operation, options Options) error {
 		}
 		switch operation.Kind {
 		case Set:
-			elem, err := newStringElement(parent, target, operation.Value, operation.VR)
+			valueRepresentation, err := resolveValueRepresentation(parent, target, operation.VR)
 			if err != nil {
 				return err
 			}
-			if err := parent.AddOrUpdate(elem); err != nil {
-				return err
+			values := strings.Split(operation.Value, "\\")
+			if valueRepresentation.IsString() {
+				if err := parent.AddOrUpdateValueWithVR(target, valueRepresentation, values); err != nil {
+					return err
+				}
+			} else {
+				var replacement element.Element
+				if existing, ok := parent.Get(target); ok {
+					replacement, err = element.ReplaceCanonicalStrings(existing, target, valueRepresentation, values)
+				} else {
+					context := element.CanonicalValueContext{}
+					if syntax := parent.InternalTransferSyntax(); syntax != nil {
+						context.Endian = syntax.Endian()
+					}
+					replacement, err = element.ReplaceCanonicalStringsWithContext(target, valueRepresentation, values, context)
+				}
+				if err != nil {
+					return err
+				}
+				if err := parent.AddOrUpdate(replacement); err != nil {
+					return err
+				}
 			}
 		case Clear:
 			elem, exists := parent.Get(target)
 			if !exists {
 				return fmt.Errorf("tag %q is not present", operation.Path)
 			}
-			empty, err := emptyElement(target, elem.ValueRepresentation())
-			if err != nil {
-				return err
-			}
-			if err := parent.AddOrUpdate(empty); err != nil {
+			if elem.ValueRepresentation() == vr.SQ {
+				if err := parent.AddOrUpdate(dataset.NewSequence(target)); err != nil {
+					return err
+				}
+			} else if err := parent.AddOrUpdateValueWithVR(target, elem.ValueRepresentation(), nil); err != nil {
 				return err
 			}
 		case Delete:
@@ -75,13 +94,13 @@ func Apply(ds *dataset.Dataset, operations []Operation, options Options) error {
 			if !exists {
 				return fmt.Errorf("tag %q is not present", operation.Path)
 			}
-			old, ok := elem.(*element.String)
+			old, ok := parent.GetString(target)
 			if !ok || elem.ValueRepresentation() != vr.UI {
 				return fmt.Errorf("tag %q is not a UID", operation.Path)
 			}
 			generated := generator.next()
-			mapping[old.GetString()] = generated
-			if err := parent.AddOrUpdate(element.NewString(target, vr.UI, []string{generated})); err != nil {
+			mapping[old] = generated
+			if err := parent.AddOrUpdateValue(target, generated); err != nil {
 				return err
 			}
 		default:
@@ -111,7 +130,7 @@ func ConvertCharacterSet(ds *dataset.Dataset, outputCharset, inputCharset string
 	if err := convertDatasetCharacterSet(ds, output.Encoding, inputEncodings); err != nil {
 		return err
 	}
-	return ds.AddOrUpdate(element.NewString(tag.SpecificCharacterSet, vr.CS, []string{outputCharset}))
+	return ds.SetSpecificCharacterSet(outputCharset)
 }
 
 func convertDatasetCharacterSet(ds *dataset.Dataset, outputEncoding encoding.Encoding, inputCharsets []string) error {
@@ -124,22 +143,33 @@ func convertDatasetCharacterSet(ds *dataset.Dataset, outputEncoding encoding.Enc
 			}
 			continue
 		}
-		stringElement, ok := elem.(*element.String)
-		if !ok || !elem.ValueRepresentation().IsStringEncoded() {
+		if !elem.ValueRepresentation().IsStringEncoded() {
 			continue
 		}
-		values := stringElement.GetValues()
+		var values []string
 		if len(inputCharsets) > 0 {
 			decoded, err := charset.DecodeString(elem.Buffer().Data(), charset.GetEncodings(inputCharsets))
 			if err != nil {
 				return fmt.Errorf("decode %s with %s: %w", elem.Tag(), inputCharsets[0], err)
 			}
 			values = strings.Split(strings.TrimRight(decoded, "\x00 "), "\\")
+		} else {
+			var err error
+			values, err = element.CanonicalStrings(elem)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", elem.Tag(), err)
+			}
 		}
-		if _, err := charset.EncodeString(strings.Join(values, "\\"), []encoding.Encoding{outputEncoding}); err != nil {
+		replacement, err := element.ReplaceCanonicalStringsWithContext(
+			elem.Tag(),
+			elem.ValueRepresentation(),
+			values,
+			element.CanonicalValueContext{TextEncodings: []encoding.Encoding{outputEncoding}},
+		)
+		if err != nil {
 			return fmt.Errorf("encode %s: %w", elem.Tag(), err)
 		}
-		if err := ds.AddOrUpdate(element.NewStringWithEncoding(elem.Tag(), elem.ValueRepresentation(), values, outputEncoding)); err != nil {
+		if err := ds.AddOrUpdate(replacement); err != nil {
 			return err
 		}
 	}
@@ -179,7 +209,7 @@ func parentFor(ds *dataset.Dataset, path string) (*dataset.Dataset, *tag.Tag, er
 	return current, target.Tag, nil
 }
 
-func newStringElement(parent *dataset.Dataset, target *tag.Tag, value, explicitVR string) (element.Element, error) {
+func resolveValueRepresentation(parent *dataset.Dataset, target *tag.Tag, explicitVR string) (*vr.VR, error) {
 	selected := explicitVR
 	if selected == "" {
 		if existing, ok := parent.Get(target); ok {
@@ -194,140 +224,7 @@ func newStringElement(parent *dataset.Dataset, target *tag.Tag, value, explicitV
 	if err != nil {
 		return nil, err
 	}
-	values := strings.Split(value, "\\")
-	if parsedVR.IsString() {
-		if err := parsedVR.ValidateString(value); err != nil {
-			return nil, err
-		}
-		return element.NewString(target, parsedVR, values), nil
-	}
-	return newNumericElement(target, parsedVR, values)
-}
-
-func newNumericElement(target *tag.Tag, valueRepresentation *vr.VR, values []string) (element.Element, error) {
-	switch valueRepresentation.Code() {
-	case vr.CodeUS:
-		parsed, err := parseUnsigned(values, 16)
-		if err != nil {
-			return nil, err
-		}
-		cast := make([]uint16, len(parsed))
-		for i := range parsed {
-			cast[i] = uint16(parsed[i])
-		}
-		return element.NewUnsignedShort(target, cast), nil
-	case vr.CodeSS:
-		parsed, err := parseSigned(values, 16)
-		if err != nil {
-			return nil, err
-		}
-		cast := make([]int16, len(parsed))
-		for i := range parsed {
-			cast[i] = int16(parsed[i])
-		}
-		return element.NewSignedShort(target, cast), nil
-	case vr.CodeUL:
-		parsed, err := parseUnsigned(values, 32)
-		if err != nil {
-			return nil, err
-		}
-		cast := make([]uint32, len(parsed))
-		for i := range parsed {
-			cast[i] = uint32(parsed[i])
-		}
-		return element.NewUnsignedLong(target, cast), nil
-	case vr.CodeSL:
-		parsed, err := parseSigned(values, 32)
-		if err != nil {
-			return nil, err
-		}
-		cast := make([]int32, len(parsed))
-		for i := range parsed {
-			cast[i] = int32(parsed[i])
-		}
-		return element.NewSignedLong(target, cast), nil
-	case vr.CodeSV:
-		parsed, err := parseSigned(values, 64)
-		if err != nil {
-			return nil, err
-		}
-		return element.NewSignedVeryLong(target, parsed), nil
-	case vr.CodeUV:
-		parsed, err := parseUnsigned(values, 64)
-		if err != nil {
-			return nil, err
-		}
-		return element.NewUnsignedVeryLong(target, parsed), nil
-	case vr.CodeFL:
-		parsed, err := parseFloat32(values)
-		if err != nil {
-			return nil, err
-		}
-		return element.NewFloat(target, parsed), nil
-	case vr.CodeFD:
-		parsed, err := parseFloat64(values)
-		if err != nil {
-			return nil, err
-		}
-		return element.NewDouble(target, parsed), nil
-	default:
-		return nil, fmt.Errorf("VR %s is not supported by --set", valueRepresentation.Code())
-	}
-}
-
-func emptyElement(target *tag.Tag, valueRepresentation *vr.VR) (element.Element, error) {
-	if valueRepresentation.IsString() {
-		return element.NewString(target, valueRepresentation, nil), nil
-	}
-	if valueRepresentation == vr.SQ {
-		return dataset.NewSequence(target), nil
-	}
-	return newNumericElement(target, valueRepresentation, nil)
-}
-
-func parseUnsigned(values []string, bits int) ([]uint64, error) {
-	parsed := make([]uint64, len(values))
-	for i, value := range values {
-		number, err := strconv.ParseUint(value, 10, bits)
-		if err != nil {
-			return nil, fmt.Errorf("value %q is not an unsigned %d-bit integer: %w", value, bits, err)
-		}
-		parsed[i] = number
-	}
-	return parsed, nil
-}
-func parseSigned(values []string, bits int) ([]int64, error) {
-	parsed := make([]int64, len(values))
-	for i, value := range values {
-		number, err := strconv.ParseInt(value, 10, bits)
-		if err != nil {
-			return nil, fmt.Errorf("value %q is not a signed %d-bit integer: %w", value, bits, err)
-		}
-		parsed[i] = number
-	}
-	return parsed, nil
-}
-func parseFloat32(values []string) ([]float32, error) {
-	parsed := make([]float32, len(values))
-	for i, value := range values {
-		number, err := strconv.ParseFloat(value, 32)
-		if err != nil {
-			return nil, fmt.Errorf("value %q is not a 32-bit float: %w", value, err)
-		}
-		parsed[i] = float32(number)
-	}
-	return parsed, nil
-}
-func parseFloat64(values []string) ([]float64, error) {
-	parsed := make([]float64, len(values))
-	for i, value := range values {
-		number, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return nil, fmt.Errorf("value %q is not a 64-bit float: %w", value, err)
-		}
-		parsed[i] = number
-	}
-	return parsed, nil
+	return parsedVR, nil
 }
 
 type uidGenerator struct {
@@ -350,11 +247,13 @@ func remapUIDs(ds *dataset.Dataset, mapping map[string]string, generator *uidGen
 			}
 			continue
 		}
-		stringElement, ok := elem.(*element.String)
-		if !ok || elem.ValueRepresentation() != vr.UI {
+		if elem.ValueRepresentation() != vr.UI {
 			continue
 		}
-		values := stringElement.GetValues()
+		values, ok := ds.GetStrings(elem.Tag())
+		if !ok {
+			continue
+		}
 		changed := false
 		for index, value := range values {
 			mapped, ok := mapping[value]
@@ -367,7 +266,7 @@ func remapUIDs(ds *dataset.Dataset, mapping map[string]string, generator *uidGen
 			}
 		}
 		if changed {
-			_ = ds.AddOrUpdate(element.NewString(elem.Tag(), vr.UI, values))
+			_ = ds.AddOrUpdateValue(elem.Tag(), values)
 		}
 	}
 }

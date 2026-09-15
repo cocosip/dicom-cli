@@ -276,8 +276,8 @@ func collectAnonymizeValues(ds *dataset.Dataset, prefix string, values map[strin
 			}
 			continue
 		}
-		if stringElement, ok := elem.(*element.String); ok {
-			values[path] = strings.Join(stringElement.GetValues(), "\\")
+		if canonical, err := element.CanonicalStrings(elem); err == nil {
+			values[path] = strings.Join(canonical, "\\")
 			continue
 		}
 		values[path] = fmt.Sprint(elem)

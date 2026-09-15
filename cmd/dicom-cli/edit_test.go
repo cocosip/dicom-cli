@@ -6,10 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cocosip/dicom-cli/internal/dicom"
 	"github.com/cocosip/dicom-cli/internal/testutil"
-	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
+	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 )
 
 func TestExecuteEditWritesNewFileAndPreservesInput(t *testing.T) {
@@ -37,9 +36,9 @@ func TestExecuteEditWritesNewFileAndPreservesInput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	elem, err := dicom.ResolveElement(parsed.Dataset, "PatientName")
-	if err != nil || elem.(*element.String).GetString() != "EDITED^PATIENT" {
-		t.Fatalf("edited PatientName = %#v, %v", elem, err)
+	name, ok := parsed.Dataset.GetString(tag.PatientName)
+	if !ok || name != "EDITED^PATIENT" {
+		t.Fatalf("edited PatientName = %q, found=%t", name, ok)
 	}
 }
 
@@ -57,9 +56,9 @@ func TestExecuteEditUpdatesCharacterSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	charset, err := dicom.ResolveElement(parsed.Dataset, "SpecificCharacterSet")
-	if err != nil || charset.(*element.String).GetString() != "ISO_IR 192" {
-		t.Fatalf("SpecificCharacterSet = %#v, %v", charset, err)
+	charset, ok := parsed.Dataset.GetString(tag.SpecificCharacterSet)
+	if !ok || charset != "ISO_IR 192" {
+		t.Fatalf("SpecificCharacterSet = %q, found=%t", charset, ok)
 	}
 }
 

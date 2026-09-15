@@ -21,8 +21,8 @@ func newEncapsulateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 		Example: "  dicom-cli encapsulate image --patient-name ANON^PATIENT --output image.dcm source.png\n" +
 			"  dicom-cli encapsulate image --template secondary-capture --rules dicom-cli-rules.yaml --output output images",
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runImageToDICOMWithMetadata(runtime, root, args[0], patientName, templateName, referencePath, destination, recursive, failFast, flatten)
+		RunE: func(command *cobra.Command, args []string) error {
+			return runImageToDICOMWithMetadata(command.Context(), runtime, root, args[0], patientName, templateName, referencePath, destination, recursive, failFast, flatten)
 		},
 	}
 	imageCommand.Flags().StringVar(&patientName, "patient-name", "", root.localizer.FlagUsage("patient-name", "required PatientName for created DICOM files"))

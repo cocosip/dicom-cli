@@ -75,6 +75,21 @@ func TestValidateAppliesBuiltInCTImageIODRule(t *testing.T) {
 	}
 }
 
+func TestEvaluateReadsTypedPersonName(t *testing.T) {
+	fixtures, err := testutil.CreateDICOMFixtures(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parser.ParseFile(fixtures.SingleFrame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "SYNTHETIC^PATIENT"
+	if !evaluate(parsed, rules.Condition{Path: "PatientName", Equals: &want}) {
+		t.Fatal("evaluate() = false for a typed PN value")
+	}
+}
+
 func hasIssue(issues []Issue, path string, severity Severity) bool {
 	for _, issue := range issues {
 		if issue.Path == path && issue.Severity == severity {

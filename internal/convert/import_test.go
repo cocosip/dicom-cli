@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"context"
 	"image"
 	"image/color"
 	"image/png"
@@ -8,7 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
+	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 )
 
 func TestLoadImageAccepts16BitGrayPNGAndRejectsUnsupportedExtension(t *testing.T) {
@@ -59,10 +62,10 @@ func TestLoadImageRejects16BitColorPNG(t *testing.T) {
 
 func TestNewSecondaryCaptureRequiresPatientNameAndBuildsImageDataset(t *testing.T) {
 	imageValue := ImportedImage{Width: 2, Height: 1, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 1, PhotometricInterpretation: "MONOCHROME2", PixelData: []byte{0, 255}}
-	if _, err := NewSecondaryCapture(imageValue, SecondaryCaptureOptions{}); err == nil {
+	if _, err := NewSecondaryCapture(context.Background(), imageValue, SecondaryCaptureOptions{}); err == nil {
 		t.Fatal("NewSecondaryCapture() succeeded without required PatientName")
 	}
-	dataset, err := NewSecondaryCapture(imageValue, SecondaryCaptureOptions{PatientName: "SYNTHETIC^PATIENT"})
+	dataset, err := NewSecondaryCapture(context.Background(), imageValue, SecondaryCaptureOptions{PatientName: "SYNTHETIC^PATIENT"})
 	if err != nil {
 		t.Fatalf("NewSecondaryCapture() error = %v", err)
 	}
@@ -77,9 +80,35 @@ func TestNewSecondaryCaptureRequiresPatientNameAndBuildsImageDataset(t *testing.
 	}
 }
 
+func TestNewSecondaryCaptureCreatesTypedPersonName(t *testing.T) {
+	imageValue := ImportedImage{Width: 1, Height: 1, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 1, PhotometricInterpretation: "MONOCHROME2", PixelData: []byte{0}}
+	ds, err := NewSecondaryCapture(context.Background(), imageValue, SecondaryCaptureOptions{PatientName: "SYNTHETIC^PATIENT"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	patientName, ok := ds.Get(tag.PatientName)
+	if !ok {
+		t.Fatal("PatientName is missing")
+	}
+	if _, ok := patientName.(*element.PersonName); !ok {
+		t.Fatalf("PatientName type = %T, want *element.PersonName", patientName)
+	}
+}
+
+func TestNewSecondaryCaptureSetsDatasetTransferSyntax(t *testing.T) {
+	imageValue := ImportedImage{Width: 1, Height: 1, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 1, PhotometricInterpretation: "MONOCHROME2", PixelData: []byte{0}}
+	ds, err := NewSecondaryCapture(context.Background(), imageValue, SecondaryCaptureOptions{PatientName: "SYNTHETIC^PATIENT"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ds.InternalTransferSyntax() != transfer.ExplicitVRLittleEndian {
+		t.Fatalf("InternalTransferSyntax() = %v, want Explicit VR Little Endian", ds.InternalTransferSyntax())
+	}
+}
+
 func TestApplyMetadataUsesLaterSourcesAsOverrides(t *testing.T) {
 	imageValue := ImportedImage{Width: 1, Height: 1, BitsAllocated: 8, BitsStored: 8, SamplesPerPixel: 1, PhotometricInterpretation: "MONOCHROME2", PixelData: []byte{0}}
-	dataset, err := NewSecondaryCapture(imageValue, SecondaryCaptureOptions{PatientName: "SYNTHETIC^PATIENT"})
+	dataset, err := NewSecondaryCapture(context.Background(), imageValue, SecondaryCaptureOptions{PatientName: "SYNTHETIC^PATIENT"})
 	if err != nil {
 		t.Fatal(err)
 	}

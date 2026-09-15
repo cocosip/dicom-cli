@@ -1,19 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cocosip/dicom-cli/internal/testutil"
-	"github.com/cocosip/go-dicom/pkg/dicom/element"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/tag"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
-	"github.com/cocosip/go-dicom/pkg/dicom/vr"
 	"github.com/cocosip/go-dicom/pkg/dicom/writer"
-	"golang.org/x/text/encoding/unicode"
 )
 
 func TestExecuteValidateReturnsThreeForStrictProfileWarning(t *testing.T) {
@@ -111,17 +109,25 @@ func writeCharsetMismatchFixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, value := range []element.Element{
-		element.NewString(tag.SpecificCharacterSet, vr.CS, []string{"GB18030"}),
-		element.NewStringWithEncoding(tag.PatientName, vr.PN, []string{"张三"}, unicode.UTF8),
-		element.NewStringWithEncoding(tag.InstitutionName, vr.LO, []string{"示例医院"}, unicode.UTF8),
-	} {
-		if err := parsed.Dataset.AddOrUpdate(value); err != nil {
-			t.Fatal(err)
-		}
+	if err := parsed.Dataset.SetSpecificCharacterSet("ISO_IR 192"); err != nil {
+		t.Fatal(err)
+	}
+	if err := parsed.Dataset.AddOrUpdateValue(tag.PatientName, "张三"); err != nil {
+		t.Fatal(err)
+	}
+	if err := parsed.Dataset.AddOrUpdateValue(tag.InstitutionName, "示例医院"); err != nil {
+		t.Fatal(err)
 	}
 	path := filepath.Join(t.TempDir(), "charset-mismatch.dcm")
 	if err := writer.WriteFile(path, parsed.Dataset, writer.WithTransferSyntax(transfer.ExplicitVRLittleEndian)); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content = bytes.Replace(content, []byte("ISO_IR 192"), []byte("GB18030   "), 1)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path

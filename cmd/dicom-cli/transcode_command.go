@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -39,7 +40,7 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			}
 			return nil
 		},
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(command *cobra.Command, args []string) error {
 			inputPath := input
 			if inputPath == "" {
 				inputPath = args[0]
@@ -99,7 +100,7 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 					}
 					outputPath, pathErr := files.OutputPath(entry.Path, inputPath, destination, !flatten)
 					if pathErr == nil {
-						pathErr = transcodeFile(entry.Path, outputPath, format.Syntax)
+						pathErr = transcodeFile(command.Context(), entry.Path, outputPath, format.Syntax)
 					}
 					if pathErr != nil {
 						failed++
@@ -118,7 +119,7 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			} else if !os.IsNotExist(err) {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
-			if err := transcodeFile(inputPath, destination, format.Syntax); err != nil {
+			if err := transcodeFile(command.Context(), inputPath, destination, format.Syntax); err != nil {
 				return apperr.Wrap(apperr.KindOperation, err)
 			}
 			return nil
@@ -209,12 +210,12 @@ func loadTranscodeFilter(runtime Runtime, configuredRules, name string) (*rules.
 	return &condition, nil
 }
 
-func transcodeFile(input, destination string, syntax *transfer.Syntax) error {
+func transcodeFile(ctx context.Context, input, destination string, syntax *transfer.Syntax) error {
 	parsed, err := parser.ParseFile(input)
 	if err != nil {
 		return err
 	}
-	converted, err := convertpkg.Transcode(parsed.Dataset, parsed.TransferSyntax, syntax)
+	converted, err := convertpkg.Transcode(ctx, parsed.Dataset, parsed.TransferSyntax, syntax)
 	if err != nil {
 		return err
 	}

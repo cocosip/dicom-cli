@@ -3,6 +3,7 @@ package main
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/cocosip/dicom-cli/internal/dicom"
 	"github.com/cocosip/dicom-cli/internal/rules"
@@ -50,8 +51,9 @@ func matchCondition(ds *dataset.Dataset, condition rules.Condition) bool {
 }
 
 func elementValue(elem element.Element) string {
-	if value, ok := elem.(*element.String); ok {
-		return value.GetString()
+	values, err := element.CanonicalStrings(elem)
+	if err == nil {
+		return strings.Join(values, "\\")
 	}
 	return elem.String()
 }
