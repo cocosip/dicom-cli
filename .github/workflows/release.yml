@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -74,6 +76,20 @@ jobs:
           tar -xzf "dist/dicom-cli_${GITHUB_REF_NAME#v}_linux_amd64.tar.gz" -C smoke
           "smoke/dicom-cli_${GITHUB_REF_NAME#v}_linux_amd64/dicom-cli" --help
 
+      - name: Generate changelog
+        shell: bash
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          CURR_TAG=$GITHUB_REF_NAME
+          {
+            echo "## What's Changed"
+            echo ""
+            git log "${PREV_TAG}..HEAD" --pretty=tformat:"- %s" --no-merges
+            echo ""
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${CURR_TAG}"
+          } > CHANGELOG_BODY.md
+          cat CHANGELOG_BODY.md
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -84,4 +100,4 @@ jobs:
             "dist/dicom-cli_${GITHUB_REF_NAME#v}_linux_arm64.tar.gz" \
             "dist/dicom-cli_${GITHUB_REF_NAME#v}_darwin_amd64.tar.gz" \
             "dist/dicom-cli_${GITHUB_REF_NAME#v}_darwin_arm64.tar.gz" \
-            --generate-notes --title "$GITHUB_REF_NAME"
+            --notes-file CHANGELOG_BODY.md --title "$GITHUB_REF_NAME"
