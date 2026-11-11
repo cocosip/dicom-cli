@@ -9,9 +9,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cocosip/dicom-cli/internal/app"
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	convertpkg "github.com/cocosip/dicom-cli/internal/convert"
 	"github.com/cocosip/dicom-cli/internal/files"
+	"github.com/cocosip/dicom-cli/internal/output"
 	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
@@ -34,12 +36,20 @@ type dicomExportOptions struct {
 func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	text := root.localizer.Command("convert")
 	options := dicomExportOptions{format: "png"}
-	var imageInput, jsonInput, xmlInput, pixelDataInput string
+	var imageInput, metadataInput, metadataFormat string
 	command := &cobra.Command{
 		Use:   "convert",
 		Short: text.Short,
 		Long:  text.Long,
 		Args:  noArgs,
+	}
+
+	addExportFlags := func(command *cobra.Command, input *string, outputHelp string) {
+		command.Flags().StringVarP(input, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
+		command.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", outputHelp))
+		command.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
+		command.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
+		command.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
 	}
 
 	imageText := root.localizer.Command("convert image")
@@ -57,93 +67,36 @@ func newConvertCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			return runDICOMExport(command.Context(), runtime, imageInput, options)
 		},
 	}
-	imageCommand.Flags().StringVarP(&imageInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
+	addExportFlags(imageCommand, &imageInput, "output file, directory, or -")
 	imageCommand.Flags().StringVar(&options.format, "format", "png", root.localizer.FlagUsage("format", "output format: png or jpeg"))
-	imageCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file, directory, or -"))
 	imageCommand.Flags().IntVar(&options.frame, "frame", 0, root.localizer.FlagUsage("frame", "one-based frame number"))
 	imageCommand.Flags().BoolVar(&options.allFrames, "all-frames", false, root.localizer.FlagUsage("all-frames", "export every image frame"))
-	imageCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
-	imageCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
-	imageCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
 
-	jsonText := root.localizer.Command("convert json")
-	jsonCommand := &cobra.Command{
-		Use:     "json --input <file-or-directory>",
-		Short:   jsonText.Short,
-		Long:    jsonText.Long,
-		Example: "  dicom-cli convert json --input image.dcm --output metadata.json",
-		Args:    noArgs,
+	metadataText := root.localizer.Command("convert metadata")
+	metadataCommand := &cobra.Command{
+		Use:   "metadata --input <file-or-directory>",
+		Short: metadataText.Short,
+		Long:  metadataText.Long,
+		Example: "  dicom-cli convert metadata --input image.dcm --format json --output metadata.json\n" +
+			"  dicom-cli convert metadata --input image.dcm --format xml --output metadata.xml\n" +
+			"  dicom-cli convert metadata --input image.dcm --format pixeldata --output pixels.bin",
+		Args: noArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			if jsonInput == "" {
+			if metadataInput == "" {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
 			}
-			options.format = "json"
-			return runDICOMExport(command.Context(), runtime, jsonInput, options)
+			options.format = metadataFormat
+			return runDICOMExport(command.Context(), runtime, metadataInput, options)
 		},
 	}
-	jsonCommand.Flags().StringVarP(&jsonInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
-	jsonCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
-	jsonCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
-	jsonCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
-	jsonCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
-
-	xmlText := root.localizer.Command("convert xml")
-	xmlCommand := &cobra.Command{
-		Use:     "xml --input <file-or-directory>",
-		Short:   xmlText.Short,
-		Long:    xmlText.Long,
-		Example: "  dicom-cli convert xml --input image.dcm --output metadata.xml",
-		Args:    noArgs,
-		RunE: func(command *cobra.Command, _ []string) error {
-			if xmlInput == "" {
-				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
-			}
-			options.format = "xml"
-			return runDICOMExport(command.Context(), runtime, xmlInput, options)
-		},
-	}
-	xmlCommand.Flags().StringVarP(&xmlInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
-	xmlCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
-	xmlCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
-	xmlCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
-	xmlCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
-
-	pixelDataText := root.localizer.Command("convert pixeldata")
-	pixelDataCommand := &cobra.Command{
-		Use:     "pixeldata --input <file-or-directory>",
-		Short:   pixelDataText.Short,
-		Long:    pixelDataText.Long,
-		Example: "  dicom-cli convert pixeldata --input image.dcm --output pixels.bin",
-		Args:    noArgs,
-		RunE: func(command *cobra.Command, _ []string) error {
-			if pixelDataInput == "" {
-				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--input is required"))
-			}
-			options.format = "pixeldata"
-			return runDICOMExport(command.Context(), runtime, pixelDataInput, options)
-		},
-	}
-	pixelDataCommand.Flags().StringVarP(&pixelDataInput, "input", "i", "", root.localizer.FlagUsage("input", "input DICOM file or directory"))
-	pixelDataCommand.Flags().StringVarP(&options.destination, "output", "o", "", root.localizer.FlagUsage("output", "output file or -"))
-	pixelDataCommand.Flags().BoolVarP(&options.recursive, "recursive", "r", false, root.localizer.FlagUsage("recursive", "scan subdirectories"))
-	pixelDataCommand.Flags().BoolVar(&options.failFast, "fail-fast", false, root.localizer.FlagUsage("fail-fast", "stop after the first file failure"))
-	pixelDataCommand.Flags().BoolVar(&options.flatten, "flatten", false, root.localizer.FlagUsage("flatten", "do not preserve input directory structure"))
+	addExportFlags(metadataCommand, &metadataInput, "output file or -")
+	metadataCommand.Flags().StringVar(&metadataFormat, "format", "json", root.localizer.FlagUsage("format", "metadata format: json, xml, or pixeldata"))
 
 	localizedHelpFlag(command, root.localizer)
 	localizedHelpFlag(imageCommand, root.localizer)
-	localizedHelpFlag(jsonCommand, root.localizer)
-	localizedHelpFlag(xmlCommand, root.localizer)
-	localizedHelpFlag(pixelDataCommand, root.localizer)
-	command.AddCommand(imageCommand, jsonCommand, xmlCommand, pixelDataCommand)
+	localizedHelpFlag(metadataCommand, root.localizer)
+	command.AddCommand(imageCommand, metadataCommand)
 	return command
-}
-
-func runImageToDICOMWithMetadata(ctx context.Context, runtime Runtime, root *rootOptions, input, patientName, templateName, referencePath, destination string, recursive, failFast, flatten bool) error {
-	template, reference, err := imageMetadataSources(runtime, root.rulesPath, templateName, referencePath)
-	if err != nil {
-		return apperr.Wrap(apperr.KindInput, err)
-	}
-	return runImageToDICOM(ctx, runtime, input, patientName, destination, recursive, failFast, flatten, template, reference)
 }
 
 func runImageToDICOM(ctx context.Context, runtime Runtime, input, patientName, destination string, recursive, failFast, flatten bool, template map[string]string, reference *dataset.Dataset) error {
@@ -329,20 +282,11 @@ func runDICOMExportDirectory(ctx context.Context, runtime Runtime, input, format
 	if err != nil {
 		return apperr.Wrap(apperr.KindOperation, err)
 	}
-	failed := 0
-	for _, entry := range entries {
-		if entry.Skipped {
-			continue
-		}
-		if err := runDICOMExportFile(ctx, runtime, entry.Path, format, options, destinationForDICOMExport(entry.Path, input, destination, format, options)); err != nil {
-			failed++
-			if options.failFast {
-				break
-			}
-		}
-	}
-	if failed > 0 {
-		return apperr.Wrap(apperr.KindOperation, fmt.Errorf("convert export failed for %d file(s)", failed))
+	summary := app.Run(entries, options.failFast, func(path string) error {
+		return runDICOMExportFile(ctx, runtime, path, format, options, destinationForDICOMExport(path, input, destination, format, options))
+	})
+	if summary.Failed > 0 {
+		return apperr.Wrap(apperr.KindOperation, fmt.Errorf("convert export failed for %d file(s)", summary.Failed))
 	}
 	return nil
 }
@@ -451,15 +395,10 @@ func writeExport(runtime Runtime, input, destination, extension string, content 
 	if filepath.Clean(inputPath) == filepath.Clean(outputPath) {
 		return apperr.Wrap(apperr.KindInput, fmt.Errorf("output path is the input path"))
 	}
-	if _, err := os.Stat(destination); err == nil {
-		return apperr.Wrap(apperr.KindInput, fmt.Errorf("output file %q already exists", destination))
-	} else if !os.IsNotExist(err) {
-		return err
+	if err := output.NewFile(destination, content); err != nil {
+		return apperr.Wrap(apperr.KindInput, err)
 	}
-	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(destination, content, 0o600)
+	return nil
 }
 
 func frameOutputName(input, extension string, frame int) string {

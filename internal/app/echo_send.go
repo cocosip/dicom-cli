@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -114,7 +115,7 @@ func Open(ctx context.Context, target config.PACSTarget, instances []Instance) (
 		if instance.Dataset == nil || instance.SOPClass == "" || instance.TransferSyntax == "" {
 			return nil, fmt.Errorf("invalid C-STORE instance %q", instance.Path)
 		}
-		if !contains(contexts[instance.SOPClass], instance.TransferSyntax) {
+		if !slices.Contains(contexts[instance.SOPClass], instance.TransferSyntax) {
 			contexts[instance.SOPClass] = append(contexts[instance.SOPClass], instance.TransferSyntax)
 		}
 	}
@@ -234,16 +235,7 @@ func splitInstances(instances []Instance, maxInstances int) [][]Instance {
 	if maxInstances <= 0 || maxInstances >= len(instances) {
 		return [][]Instance{instances}
 	}
-	groups := make([][]Instance, 0, (len(instances)+maxInstances-1)/maxInstances)
-	for len(instances) > 0 {
-		end := maxInstances
-		if end > len(instances) {
-			end = len(instances)
-		}
-		groups = append(groups, instances[:end])
-		instances = instances[end:]
-	}
-	return groups
+	return slices.Collect(slices.Chunk(instances, maxInstances))
 }
 
 func sendGroup(ctx context.Context, progress io.Writer, localizer i18n.Localizer, target config.PACSTarget, group []Instance, retries int) []SendFileResult {
@@ -309,13 +301,4 @@ func newClient(target config.PACSTarget) *client.Client {
 		client.WithAssociationTimeout(timeouts.Associate),
 		client.WithRequestTimeout(timeouts.Idle),
 	)
-}
-
-func contains(values []string, value string) bool {
-	for _, candidate := range values {
-		if candidate == value {
-			return true
-		}
-	}
-	return false
 }

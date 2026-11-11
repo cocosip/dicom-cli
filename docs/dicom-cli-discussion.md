@@ -277,9 +277,7 @@ dicom-cli
   anonymize <file-or-directory>          # 标签脱敏
   edit <file>                            # 单文件 Tag 修改
   convert image <file-or-directory>      # DICOM 导出 PNG/JPEG
-  convert json <file-or-directory>       # DICOM 元数据导出 JSON
-  convert xml <file-or-directory>        # DICOM 元数据导出 Native DICOM Model XML
-  convert pixeldata <file-or-directory>  # DICOM 导出原始 PixelData 帧载荷
+  convert metadata <file-or-directory> --format json|xml|pixeldata  # DICOM 元数据或原始 PixelData 导出
   encapsulate image <file-or-directory>  # PNG/JPEG 封装 Secondary Capture DICOM
   transcode <file-or-directory> --to ... # 传输语法转换
   transcode formats                       # 列出可用传输语法

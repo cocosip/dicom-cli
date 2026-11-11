@@ -23,7 +23,6 @@ func newConfigCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	localizedHelpFlag(command, root.localizer)
 	command.AddCommand(newConfigInitCommand(runtime, root))
 	command.AddCommand(newConfigValidateCommand(runtime, root))
-	command.AddCommand(newConfigLanguageCommand(runtime, root))
 	command.AddCommand(newConfigTargetCommand(runtime, root))
 	return command
 }
@@ -83,26 +82,6 @@ func newConfigValidateCommand(runtime Runtime, root *rootOptions) *cobra.Command
 				return apperr.Wrap(apperr.KindInput, err)
 			}
 			_, err = fmt.Fprintln(runtime.Stdout, root.localizer.Text(i18n.ConfigValid))
-			return err
-		},
-	}
-	localizedHelpFlag(command, root.localizer)
-	return command
-}
-
-func newConfigLanguageCommand(runtime Runtime, root *rootOptions) *cobra.Command {
-	text := root.localizer.Command("config language")
-	command := &cobra.Command{
-		Use:     "language <en|zh-CN>",
-		Short:   text.Short,
-		Long:    text.Long,
-		Example: "  dicom-cli config language zh-CN\n  dicom-cli --config dicom-cli.yaml config language en",
-		Args:    cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			if err := setConfiguredLanguage(runtime, root, args[0]); err != nil {
-				return err
-			}
-			_, err := fmt.Fprintf(runtime.Stdout, "language=%s\n", args[0])
 			return err
 		},
 	}

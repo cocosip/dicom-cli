@@ -8,7 +8,7 @@
 
 - 检查、校验和编辑单个 DICOM 文件。
 - 以 DICOM Basic Application Level Confidentiality Profile 为基础进行脱敏。
-- 导出 DICOM 图像帧或元数据 JSON，并将受支持的 PNG/JPEG 封装为 Secondary
+- 导出 DICOM 图像帧、元数据 JSON/XML 或原始 PixelData，并将受支持的 PNG/JPEG 封装为 Secondary
   Capture DICOM。
 - 按当前二进制注册的 codec 转换传输语法。
 - 通过明文 TCP 执行 C-ECHO 和 C-STORE。
@@ -81,19 +81,19 @@ dicom-cli anonymize --recursive --output anonymized study
 ```sh
 dicom-cli convert image --input study/image.dcm --format png --output image.png
 dicom-cli convert image --input study/multiframe.dcm --all-frames --output frames
-dicom-cli convert json --input study/image.dcm --output metadata.json
-dicom-cli convert xml --input study/image.dcm --output metadata.xml
-dicom-cli convert pixeldata --input study/image.dcm --output pixels.bin
+dicom-cli convert metadata --format json --input study/image.dcm --output metadata.json
+dicom-cli convert metadata --format xml --input study/image.dcm --output metadata.xml
+dicom-cli convert metadata --format pixeldata --input study/image.dcm --output pixels.bin
 dicom-cli transcode formats
 dicom-cli transcode --input study/image.dcm --to rle --output compressed.dcm
 dicom-cli transcode --input study/image.dcm --to jpeg2000-lossless --output j2k-lossless.dcm
 dicom-cli transcode --input study --recursive --to rle --output compressed-study
 ```
 
-`convert image` 的 `--frame` 从 1 开始计数，省略时导出首帧。`convert json` 和
-`convert xml` 只导出元数据，不包含 PixelData；需要原始像素字节时使用
-`convert pixeldata`。该命令按帧顺序写入存储载荷，不解码或转码，且不包含 DICOM
-元素头、Basic Offset Table 或 fragment Item 头。转码前应先用
+`convert image` 的 `--frame` 从 1 开始计数，省略时导出首帧。`convert metadata
+--format json` 和 `--format xml` 只导出元数据，不包含 PixelData；需要原始像素字节时
+使用 `--format pixeldata`。该模式按帧顺序写入存储载荷，不解码或转码，且不包含
+DICOM 元素头、Basic Offset Table 或 fragment Item 头。转码前应先用
 `transcode formats` 确认目标别名或 UID 在当前二进制中可用。`transcode` 使用
 `--input/-i` 明确指定一个输入路径：输入是文件时 `--output` 为新 `.dcm` 文件，输入
 是目录时 `--output` 为输出目录。旧的尾部位置参数仍可用，但不能与 `--input` 同时
@@ -122,7 +122,7 @@ Get-Content failed-paths.txt | dicom-cli send --target local-pacs -
 | `validate <file>` | 执行内置和命名规则 profile 校验。 |
 | `edit <file>` | 写出经标签、UID 或字符集修改的新文件。 |
 | `anonymize <file-or-directory>` | 按 go-dicom 内置 Basic Profile 脱敏。 |
-| `convert image|json|xml|pixeldata --input <path>` | 导出图像帧、元数据或原始 PixelData 字节。 |
+| `convert image|metadata --input <path>` | 导出图像帧、元数据或原始 PixelData 字节。 |
 | `encapsulate image <input>` | 将受支持的 PNG/JPEG 写为未压缩 Secondary Capture DICOM。 |
 | `transcode --input <path>` | 将一个 DICOM 文件或一个目录转码至指定传输语法。 |
 | `transcode formats` | 列出当前二进制实际注册的编解码能力。 |
@@ -136,9 +136,8 @@ Get-Content failed-paths.txt | dicom-cli send --target local-pacs -
 
 ## 语言、输出和退出码
 
-运行配置的 `language` 支持 `en`（默认）和 `zh-CN`。`lang` 与
-`config language` 会保存所选语言；当没有发现配置文件时，`lang` 会在当前目录
-创建 `dicom-cli.yaml`。命令名、flag、JSON 字段和值、规则 DSL、DICOM Tag/UID 和
+运行配置的 `language` 支持 `en`（默认）和 `zh-CN`。`lang` 会保存所选语言；
+当没有发现配置文件时，`lang` 会在当前目录创建 `dicom-cli.yaml`。命令名、flag、JSON 字段和值、规则 DSL、DICOM Tag/UID 和
 退出码始终保持不变。
 
 业务结果通常写入 stdout，日志和 `send` 进度写入 stderr。二进制输出到 stdout 的

@@ -31,9 +31,9 @@
 进度写入 stderr；调用脚本应按此分流。
 
 帮助、文本结果、进度和本工具生成的诊断使用运行配置根字段 `language`：`en`
-为默认英文，`zh-CN` 为简体中文。`lang <en|zh-CN>` 与
-`config language <en|zh-CN>` 会保存语言设置；如果没有发现配置文件，前者会在
-当前目录创建 `dicom-cli.yaml`。通过 `--config` 选择已有配置时，语言设置写回该文件。
+为默认英文，`zh-CN` 为简体中文。`lang <en|zh-CN>` 会保存语言设置；如果没有发现
+配置文件，它会在当前目录创建 `dicom-cli.yaml`。通过 `--config` 选择已有配置时，
+语言设置写回该文件。
 命令名、flag 名、
 JSON 字段和值、退出码、规则 DSL、DICOM Tag 和 UID 不随语言变化。配置不存在、无法读取或
 `language` 非法时，诊断以英文输出。
@@ -50,9 +50,8 @@ JSON 字段和值、退出码、规则 DSL、DICOM Tag 和 UID 不随语言变�
 传 `--force` 才允许覆盖。生成的 YAML 含有可替换的 `local-pacs` 示例目标和默认
 DIMSE 超时。`config validate [path]` 校验配置。
 
-`lang <en|zh-CN>` 是语言切换的简写，`config language <en|zh-CN>` 是等效的完整
-入口。语言命令可以在无配置时创建当前目录 `dicom-cli.yaml`；目标维护命令
-`config target ...` 则要求已经存在配置文件，可通过 `--config` 或
+`lang <en|zh-CN>` 是语言切换入口，可以在无配置时创建当前目录 `dicom-cli.yaml`；
+目标维护命令 `config target ...` 则要求已经存在配置文件，可通过 `--config` 或
 `DICOM_CLI_CONFIG` 明确选择。
 
 命名 PACS 目标通过以下命令维护：
@@ -169,19 +168,20 @@ Profile；`--option` 可重复指定标准 profile 选项。支持的选项为�
 ```sh
 dicom-cli convert image --input image.dcm --format png --output image.png
 dicom-cli convert image --input image.dcm --all-frames --output frames
-dicom-cli convert json --input image.dcm --output metadata.json
-dicom-cli convert xml --input image.dcm --output metadata.xml
-dicom-cli convert pixeldata --input image.dcm --output pixels.bin
+dicom-cli convert metadata --format json --input image.dcm --output metadata.json
+dicom-cli convert metadata --format xml --input image.dcm --output metadata.xml
+dicom-cli convert metadata --format pixeldata --input image.dcm --output pixels.bin
 ```
 
-四个子命令都必须通过 `--input/-i <path>` 提供一个 DICOM 文件或目录，不支持位置输入
-参数。`convert image` 导出 PNG 或 JPEG。`--frame` 是从 1 开始的帧号；默认导出首帧，
-`--all-frames` 导出每一帧。`convert json` 和 `convert xml` 都只导出元数据，不包含
-PixelData。`convert pixeldata` 将原始帧载荷按顺序拼接为 `.bin` 文件；未压缩实例写出原始
-采样字节，封装压缩实例写出压缩帧字节，不解码、不转码，也不包含 DICOM 元素头、Basic
-Offset Table 或 fragment Item 头。
+`convert` 的两个子命令都必须通过 `--input/-i <path>` 提供一个 DICOM 文件或目录，
+不支持位置输入参数。`convert image` 导出 PNG 或 JPEG。`--frame` 是从 1 开始的帧号；
+默认导出首帧，`--all-frames` 导出每一帧。`convert metadata` 由 `--format json|xml|
+pixeldata` 选择输出：`json` 和 `xml` 只导出元数据，不包含 PixelData；`pixeldata`
+将原始帧载荷按顺序拼接为 `.bin` 文件，未压缩实例写出原始采样字节，封装压缩实例写出
+压缩帧字节，不解码、不转码，也不包含 DICOM 元素头、Basic Offset Table 或 fragment
+Item 头。
 
-四个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
+两个子命令都支持文件或目录输入、`--recursive`、`--flatten`、`--fail-fast` 和
 `--output`。目录默认不递归；`convert image` 只处理 `.dcm` 文件，扩展名不匹配的
 目录项会作为跳过项。图片二进制 stdout 要求恰好一个结果；多帧、多文件和目录输入
 不得使用 `--output -`。未传 `--output` 时，结果写入当前目录下的 `convert` 子目录。
@@ -309,8 +309,8 @@ dicom-cli completion powershell > dicom-cli-completion.ps1
 
 - `edit`、单文件 `anonymize` 和 `transcode` 拒绝把输出写回输入路径。
 - `anonymize --output -` 仅允许一个选中的输入文件，汇总改写到 stderr。
-- `convert image --output -` 仅允许一个图像结果；单文件输入时，`convert json --output -`、
-  `convert xml --output -` 和 `convert pixeldata --output -` 可分别写入 stdout。
+- `convert image --output -` 仅允许一个图像结果；单文件输入时，
+  `convert metadata --format json|xml|pixeldata --output -` 可将对应结果写入 stdout。
 - `--report` 和 `send --failed-list` 写入文件，不接受 `-`；脱敏报告可能含有原始值和
   UID 映射，应按敏感数据处理。
 

@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +16,7 @@ import (
 	"github.com/cocosip/dicom-cli/internal/config"
 	"github.com/cocosip/dicom-cli/internal/files"
 	"github.com/cocosip/dicom-cli/internal/i18n"
+	"github.com/cocosip/dicom-cli/internal/output"
 	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 )
@@ -82,7 +81,7 @@ func newSendCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			if maxInstances < 0 || concurrency < 1 || retries < 0 {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("--max-instances must be non-negative, --concurrency must be positive, and --retries must be non-negative"))
 			}
-			condition, err := loadSendFilter(runtime, root.rulesPath, filter)
+			condition, err := loadRulesFilter(runtime, root.rulesPath, filter, "send")
 			if err != nil {
 				return apperr.Wrap(apperr.KindInput, err)
 			}
@@ -160,14 +159,14 @@ func loadDIMSETarget(command *cobra.Command, runtime Runtime, root *rootOptions,
 		return config.PACSTarget{}, err
 	}
 	overrides := config.TargetOverrides{
-		Target:           changedString(command, "target", options.target),
-		Host:             changedString(command, "host", options.host),
-		Port:             changedInt(command, "port", options.port),
-		CallingAETitle:   changedString(command, "calling-ae", options.callingAE),
-		CalledAETitle:    changedString(command, "called-ae", options.calledAE),
-		ConnectTimeout:   changedDuration(command, "connect-timeout", options.connectTimeout),
-		AssociateTimeout: changedDuration(command, "associate-timeout", options.associateTimeout),
-		IdleTimeout:      changedDuration(command, "idle-timeout", options.idleTimeout),
+		Target:           changed(command, "target", options.target),
+		Host:             changed(command, "host", options.host),
+		Port:             changed(command, "port", options.port),
+		CallingAETitle:   changed(command, "calling-ae", options.callingAE),
+		CalledAETitle:    changed(command, "called-ae", options.calledAE),
+		ConnectTimeout:   changed(command, "connect-timeout", options.connectTimeout),
+		AssociateTimeout: changed(command, "associate-timeout", options.associateTimeout),
+		IdleTimeout:      changed(command, "idle-timeout", options.idleTimeout),
 	}
 	target, err := config.ResolveTarget(loaded, overrides, runtime.LookupEnv)
 	if err != nil {
@@ -179,28 +178,14 @@ func loadDIMSETarget(command *cobra.Command, runtime Runtime, root *rootOptions,
 	return target, nil
 }
 
-func changedString(command *cobra.Command, name, value string) *string {
+func changed[T any](command *cobra.Command, name string, value T) *T {
 	if command.Flags().Changed(name) {
 		return &value
 	}
 	return nil
 }
 
-func changedInt(command *cobra.Command, name string, value int) *int {
-	if command.Flags().Changed(name) {
-		return &value
-	}
-	return nil
-}
-
-func changedDuration(command *cobra.Command, name string, value time.Duration) *time.Duration {
-	if command.Flags().Changed(name) {
-		return &value
-	}
-	return nil
-}
-
-func loadSendFilter(runtime Runtime, configuredRules, name string) (*rules.Condition, error) {
+func loadRulesFilter(runtime Runtime, configuredRules, name, kind string) (*rules.Condition, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -214,7 +199,7 @@ func loadSendFilter(runtime Runtime, configuredRules, name string) (*rules.Condi
 	}
 	condition, ok := file.Filters[name]
 	if !ok {
-		return nil, fmt.Errorf("send filter %q does not exist", name)
+		return nil, fmt.Errorf("%s filter %q does not exist", kind, name)
 	}
 	return &condition, nil
 }
@@ -251,35 +236,19 @@ func collectStdinPaths(stdin io.Reader) ([]files.Entry, error) {
 }
 
 func writeSendJSON(path string, report app.SendReport) error {
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("report file %q already exists", path)
-	} else if !os.IsNotExist(err) {
-		return err
-	}
 	content, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, content, 0o600)
+	return output.NewFile(path, content)
 }
 
 func writeFailedList(path string, results []app.SendFileResult) error {
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("failed list %q already exists", path)
-	} else if !os.IsNotExist(err) {
-		return err
-	}
 	var paths []string
 	for _, result := range results {
 		if result.Error != "" {
 			paths = append(paths, result.Path)
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(strings.Join(paths, "\n")), 0o600)
+	return output.NewFile(path, []byte(strings.Join(paths, "\n")))
 }

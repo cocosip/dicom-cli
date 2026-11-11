@@ -1,6 +1,10 @@
 package main
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/cocosip/dicom-cli/internal/apperr"
+)
 
 func newEncapsulateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 	text := root.localizer.Command("encapsulate")
@@ -22,7 +26,11 @@ func newEncapsulateCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 			"  dicom-cli encapsulate image --template secondary-capture --rules dicom-cli-rules.yaml --output output images",
 		Args: cobra.ExactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
-			return runImageToDICOMWithMetadata(command.Context(), runtime, root, args[0], patientName, templateName, referencePath, destination, recursive, failFast, flatten)
+			template, reference, err := imageMetadataSources(runtime, root.rulesPath, templateName, referencePath)
+			if err != nil {
+				return apperr.Wrap(apperr.KindInput, err)
+			}
+			return runImageToDICOM(command.Context(), runtime, args[0], patientName, destination, recursive, failFast, flatten, template, reference)
 		},
 	}
 	imageCommand.Flags().StringVar(&patientName, "patient-name", "", root.localizer.FlagUsage("patient-name", "required PatientName for created DICOM files"))

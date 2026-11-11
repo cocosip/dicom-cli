@@ -99,29 +99,6 @@ func TestConfigTargetCRUDUsesExplicitTemporaryConfiguration(t *testing.T) {
 	}
 }
 
-func TestConfigLanguageCommandPersistsLanguageForLaterCommands(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "dicom-cli.yaml")
-	if err := os.WriteFile(path, []byte("version: v1\nlanguage: en\ntargets: {}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	runtime, stdout, stderr := testRuntime()
-	if code := Execute([]string{"--config", path, "config", "language", "zh-CN"}, runtime); code != 0 {
-		t.Fatalf("config language exit code = %d, stderr = %s", code, stderr.String())
-	}
-	if stdout.String() != "language=zh-CN\n" {
-		t.Fatalf("config language stdout = %q, want %q", stdout.String(), "language=zh-CN\n")
-	}
-
-	runtime, stdout, stderr = testRuntime()
-	if code := Execute([]string{"--config", path, "inspect", "--help"}, runtime); code != 0 {
-		t.Fatalf("inspect help exit code = %d, stderr = %s", code, stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "查看一个 DICOM 文件") {
-		t.Fatalf("persisted Chinese help = %q", stdout.String())
-	}
-}
-
 func TestRootLanguageCommandPersistsLanguage(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "dicom-cli.yaml")
 	if err := os.WriteFile(path, []byte("version: v1\nlanguage: en\ntargets: {}\n"), 0o600); err != nil {

@@ -10,11 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cocosip/dicom-cli/internal/app"
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	convertpkg "github.com/cocosip/dicom-cli/internal/convert"
 	"github.com/cocosip/dicom-cli/internal/dicom"
 	"github.com/cocosip/dicom-cli/internal/files"
-	"github.com/cocosip/dicom-cli/internal/rules"
 	"github.com/cocosip/go-dicom/pkg/dicom/parser"
 	"github.com/cocosip/go-dicom/pkg/dicom/transfer"
 	"github.com/cocosip/go-dicom/pkg/dicom/writer"
@@ -73,7 +73,7 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				return apperr.Wrap(apperr.KindInput, fmt.Errorf("output path is the input path"))
 			}
 			if inputInfo.IsDir() {
-				condition, err := loadTranscodeFilter(runtime, root.rulesPath, filterName)
+				condition, err := loadRulesFilter(runtime, root.rulesPath, filterName, "transcode")
 				if err != nil {
 					return apperr.Wrap(apperr.KindInput, err)
 				}
@@ -93,24 +93,15 @@ func newTranscodeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				if err != nil {
 					return apperr.Wrap(apperr.KindOperation, err)
 				}
-				failed := 0
-				for _, entry := range entries {
-					if entry.Skipped {
-						continue
+				summary := app.Run(entries, failFast, func(path string) error {
+					outputPath, err := files.OutputPath(path, inputPath, destination, !flatten)
+					if err != nil {
+						return err
 					}
-					outputPath, pathErr := files.OutputPath(entry.Path, inputPath, destination, !flatten)
-					if pathErr == nil {
-						pathErr = transcodeFile(command.Context(), entry.Path, outputPath, format.Syntax)
-					}
-					if pathErr != nil {
-						failed++
-						if failFast {
-							break
-						}
-					}
-				}
-				if failed > 0 {
-					return apperr.Wrap(apperr.KindOperation, fmt.Errorf("transcode failed for %d file(s)", failed))
+					return transcodeFile(command.Context(), path, outputPath, format.Syntax)
+				})
+				if summary.Failed > 0 {
+					return apperr.Wrap(apperr.KindOperation, fmt.Errorf("transcode failed for %d file(s)", summary.Failed))
 				}
 				return nil
 			}
@@ -189,25 +180,6 @@ func transcodeHelpText(base string, chinese bool) string {
 		lines = append(lines, fmt.Sprintf("  %s | %s | %s%s", format.Name, format.Alias, format.UID, marker))
 	}
 	return strings.Join(lines, "\n")
-}
-
-func loadTranscodeFilter(runtime Runtime, configuredRules, name string) (*rules.Condition, error) {
-	if name == "" {
-		return nil, nil
-	}
-	path, err := rulesPath(runtime, configuredRules, nil)
-	if err != nil {
-		return nil, err
-	}
-	file, err := rules.Load(path)
-	if err != nil {
-		return nil, err
-	}
-	condition, ok := file.Filters[name]
-	if !ok {
-		return nil, fmt.Errorf("transcode filter %q does not exist", name)
-	}
-	return &condition, nil
 }
 
 func transcodeFile(ctx context.Context, input, destination string, syntax *transfer.Syntax) error {

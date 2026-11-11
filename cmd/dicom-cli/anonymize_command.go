@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,6 +16,7 @@ import (
 	"github.com/cocosip/dicom-cli/internal/apperr"
 	"github.com/cocosip/dicom-cli/internal/files"
 	"github.com/cocosip/dicom-cli/internal/i18n"
+	"github.com/cocosip/dicom-cli/internal/output"
 	goanonymizer "github.com/cocosip/go-dicom/pkg/dicom/anonymizer"
 	"github.com/cocosip/go-dicom/pkg/dicom/dataset"
 	"github.com/cocosip/go-dicom/pkg/dicom/element"
@@ -135,8 +137,8 @@ func newAnonymizeCommand(runtime Runtime, root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if err := writeAnonymizeReport(reportPath, content); err != nil {
-					return err
+				if err := output.NewFile(reportPath, content); err != nil {
+					return apperr.Wrap(apperr.KindInput, err)
 				}
 			}
 			result := anonymizeSummary{Scanned: summary.Scanned, Processed: summary.Processed, Skipped: summary.Skipped, Failed: summary.Failed, Skips: summary.Skips}
@@ -220,18 +222,6 @@ func writeAnonymizeSummary(writer io.Writer, summary anonymizeSummary, asJSON bo
 	return err
 }
 
-func writeAnonymizeReport(path string, content []byte) error {
-	if _, err := os.Stat(path); err == nil {
-		return apperr.Wrap(apperr.KindInput, fmt.Errorf("report file %q already exists", path))
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, content, 0o600)
-}
-
 var anonymizeProfileOptions = map[string]goanonymizer.SecurityProfileOptions{
 	"retain-safe-private":                                          goanonymizer.RetainSafePrivate,
 	"retain-uids":                                                  goanonymizer.RetainUIDs,
@@ -307,9 +297,9 @@ func anonymizeChanges(before, after map[string]string) []anonymizeChange {
 }
 
 func cloneAnonymizeUIDMappings(values map[string]string) map[string]string {
-	result := make(map[string]string, len(values))
-	for original, replacement := range values {
-		result[original] = replacement
+	result := maps.Clone(values)
+	if result == nil {
+		result = map[string]string{}
 	}
 	return result
 }
